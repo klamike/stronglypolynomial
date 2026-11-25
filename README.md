@@ -15,7 +15,7 @@ turns sign labels, reliable only at slots of maximum surplus, into prices meetin
 of every consistent hypothesis. Its cost is counted in *probes*: each probe makes one label
 query and one market step (minimize a potential over an implicit pool of experts, then update
 their wealth). `formal/` formalizes that algorithm with all numerical constants as parameters,
-and proves seven kinds of statements. The ones to read are in
+and proves eight kinds of statements. The ones to read are in
 [formal/SPLP/Summary.lean](formal/SPLP/Summary.lean) and, for results 4 to 7, in
 [formal/SPLP/Margin.lean](formal/SPLP/Margin.lean),
 [formal/SPLP/LabelTest.lean](formal/SPLP/LabelTest.lean),
@@ -455,6 +455,49 @@ Section 4 by an agent, checked by me only in outline):
 - Together: `K` from about `10⁴ N³` to about `2N` to `4N`, and `log R` to order
   `N⁹ log⁴ N`. Later sections of the preprint reuse these constants and were not checked.
 
+### 8. The search as one strategy, in upstream's own query model (new)
+
+Results 1 and 2 are relational: every valid run is correct and short, and valid runs exist.
+[formal/SPLP/Strategy.lean](formal/SPLP/Strategy.lean) turns the search into a single
+adaptive strategy, a tree whose next query depends only on the answers so far. Proposals
+are chosen canonically (a vertex minimizer), and every branch of the program is shown to be
+a valid run (`prog_spec`). `exists_strategy_k4`: for integer demands there is a strategy of
+height at most `2 r₀ (2N)^46` whose queried points and output are rational and whose output
+meets all demands of every hypothesis consistent with the answers on its branch.
+
+Upstream's development states its price search (their Theorem 1.3) in a small model
+(`PriceGame/Model.lean`): a query asks for the label of one coordinate at a rational price
+vector; a hidden instance has a sign, an active set and costs in `[0, R]`; a reply is
+constrained only when the coordinate is active and minimizes cost plus signed price; a
+strategy tree must output the sign, and its height counts queries.
+[formal/SPLP/UpstreamModel.lean](formal/SPLP/UpstreamModel.lean) proves, for a verbatim copy
+of those definitions, that there is one tree, correct for every hidden instance, of height
+at most `N · 2 r₀ (2N)^46` (`exists_tree`), and with the root probes made explicit
+(`exists_tree_explicit`)
+
+    height ≤ N · 2 · (186473 + 70784 ln N + 50560 ln (R + 2)) · (2N)^46.
+
+Each label vector of the search costs `N` single-coordinate queries, the demands are
+`R + 1 - cost`, and the answer is the sign of the returned price at the anchor.
+
+The same theorem is proved against upstream's actual definitions, under upstream's
+toolchain: [upstream-patches/port/SPLPUpstream/Tree.lean](upstream-patches/port/SPLPUpstream/Tree.lean)
+imports upstream's unchanged `PriceGame/Model.lean` and this library, and proves
+`SPLPUpstream.exists_tree_explicit` for `OAI.Optimization.LinearProgramming.PriceGame.Tree`
+and `Tree.Correct`, with standard axioms only
+([upstream-patches/port/build-port.sh](upstream-patches/port/build-port.sh)). The whole
+library in `formal/` builds unchanged under both toolchains.
+
+For comparison, upstream's own strategy in that model has the bound `x^1510` with
+`x = N + size R + 1` (`recursive_query_bound`; `x^989` after the patch of result 6). Here the
+dependence on `R` is logarithmic and the degree in `N` is 47, up to the logarithm.
+
+What this does not do. Upstream's end-to-end theorem runs its own strategy on its machine
+model and accounts for the cost of every step. The tree here is only shown to exist and to be
+short in the query model: its proposals are chosen by `Classical.choose`, so nothing is
+proved about the cost of computing them (that is the market-step cost of result 2), and it
+is not connected to upstream's machine-model layer.
+
 ### Which arity
 
 Arity 4. In the table above it has the smallest exponent of `N` and a smaller power of `r₀`
@@ -533,10 +576,13 @@ formal/SPLP/PairTest.lean     Lemma 3.1 of the preprint with explicit constants
 formal/SPLP/DiffConstraints.lean  difference constraints: negative-cycle criterion, sign transfer
 formal/SPLP/BlockMinors.lean  cofactor vectors of a block-diagonal basis are one-sided
 formal/SPLP/Precision.lean    coefficient bound 3^j; the label test with explicit precision
+formal/SPLP/Strategy.lean     the search as one adaptive strategy; every branch is a valid run
+formal/SPLP/UpstreamModel.lean a short correct tree in a copy of upstream's query model
+formal/SPLP/Compat.lean       lemmas stated locally so the library builds under two Mathlib revisions
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 10700 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 11800 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
