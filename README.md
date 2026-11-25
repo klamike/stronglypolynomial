@@ -380,6 +380,24 @@ coordinates, majority votes over the rounds), so carrying the sharper analysis i
 upstream's development is not a local change; its machine-model layer implements that
 variant.
 
+Upstream's precision can be lowered as well
+([upstream-patches/radius.patch](upstream-patches/radius.patch), 25 files, on top of the two
+patches above; trace in [upstream-patches/RADIUS-REPORT.md](upstream-patches/RADIUS-REPORT.md)).
+Its radius `paperRadius N = 100 (N+1)³`, the number of bits to which logarithms of minors
+are compared, is needed from below in only three places, the binding one being
+`projection_precision` (`Geometry/Triangular.lean`), whose proof uses exactly
+`16 + 6n ≤ radius`. With `paperRadius N = 6N + 16` the top-level theorems build with standard
+axioms. Upstream's formal geometry does not contain the preprint's `H = 2^(100 N²)`; its
+label test uses pivot frames with coefficient sums at most `2^n`, which agrees with the
+reading in result 7 that a precision linear in `N` suffices. Two caveats. The interface of
+upstream's compression theorem (`ValidMinorAssignment`, `OnlineMinorLogCompression`) now
+promises agreement only to the smaller radius, which is a weaker statement, sufficient for
+its one consumer; the top-level theorem statements do not mention the radius. And the gain
+is a constant factor, not a degree: with the polynomial width the bit formula is dominated
+by `80 w⁸` either way, so its degree stays 24 and the bit count drops by a factor of about
+18 (4 or 5 in the base-two logarithm of the exponent). The fuel and resource polynomials of
+the machine-model layer are kept at the old radius as over-estimates.
+
 How the upstream Lean development handles this constant (from reading its sources; apart
 from the core just described, nothing in this paragraph is checked by a compiler). Its `paperWidth N =
 (N+1)^6` occurs 88 times in 31 files of `Compression/`. The mathematical core is generic in a

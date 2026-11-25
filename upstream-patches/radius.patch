@@ -1,0 +1,634 @@
+--- a/OAI/Optimization/LinearProgramming/Compression/AdaptiveRequests.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/AdaptiveRequests.lean
+@@ -15,10 +15,17 @@
+ 
+ variable {ι : Type*} [LinearOrder ι] [Fintype ι]
+ 
+-def paperRadius (N : ℕ) : ℕ := 100*(N+1)^3
++def paperRadius (N : ℕ) : ℕ := 6*N+16
+ def paperGrid (N : ℕ) : ℕ := 2^(paperRadius N+7)
+ def paperWidth (N : ℕ) : ℕ := (7*N^2+8)*N+1
+ 
++/-- The linear radius is below upstream's original closed form `100*(N+1)^3`; downstream
++resource bounds that were stated for the old radius remain valid upper bounds. -/
++theorem paperRadius_le_cube (N : ℕ) : paperRadius N ≤ 100*(N+1)^3 := by
++  unfold paperRadius
++  have h : N+1 ≤ (N+1)^3 := Nat.le_self_pow (by norm_num) (N+1)
++  omega
++
+ /-- The polynomial width is below upstream's original closed form `(N+1)^6`; downstream
+ resource bounds that were stated for the old width remain valid upper bounds. -/
+ theorem paperWidth_le_pow (N : ℕ) : paperWidth N ≤ (N+1)^6 := by
+--- a/OAI/Optimization/LinearProgramming/Compression/BitBudget.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/BitBudget.lean
+@@ -182,7 +182,7 @@
+ semiring so that it can be used both as an actual polynomial and as a natural budget. -/
+ def onlineMinorBitFormula {R : Type*} [CommSemiring R] (N : R) : R :=
+   let w := (7*N^2+8)*N+1
+-  let B := 100*(N+1)^3
++  let B := 6*N+16
+   let a := (2*w+B+14)+B+8
+   let L := ((B+17)+(2+a)+1)+((B+7)+a*4)
+   let n := w+1
+@@ -209,7 +209,7 @@
+ two with the same polynomial exponent in every dimension and every epoch. -/
+ theorem fiber_manuscript_value_height (N k dim : ℕ) (hk : k ≤ (7*N^2+8)*N+1) (hd : dim ≤ (7*N^2+8)*N+1) :
+     let width := (7*N^2+8)*N+1
+-    let B := 100*(N+1)^3
++    let B := 6*N+16
+     let E := (2:ℕ)^(B+7)
+     let C := max (requestCutoff (k+1)*E) (2*E)
+     let H := (B+17+4*C)*(E*C^4)
+--- a/OAI/Optimization/LinearProgramming/Compression/Bound.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/Bound.lean
+@@ -99,15 +99,14 @@
+ /-- The proxy precision chosen in Section 3 loses at most one quarter of a bit on a
+ signed subset of at most `(N+1)^6` terms. -/
+ theorem proxy_error_at_cutoff (N : ℕ) :
+-    4 * ((N:ℝ)+1)^6 * (1 / 2^(100*(N+1)^3+7 : ℕ)) ≤ 1 := by
++    4 * ((N:ℝ)+1)^6 * (1 / 2^(6*N+16+7 : ℕ)) ≤ 1 := by
+   have hlin : N+1 ≤ 2^N := N.lt_two_pow_self
+-  have hexp : 2 + N * 6 ≤ 100*(N+1)^3+7 := by
+-    nlinarith [show 0 ≤ N^3 by positivity, show 0 ≤ N^2 by positivity]
+-  have hnat : 4*(N+1)^6 ≤ 2^(100*(N+1)^3+7) := calc
++  have hexp : 2 + N * 6 ≤ 6*N+16+7 := by omega
++  have hnat : 4*(N+1)^6 ≤ 2^(6*N+16+7) := calc
+     4*(N+1)^6 ≤ 4*(2^N)^6 := Nat.mul_le_mul_left _ (Nat.pow_le_pow_left hlin _)
+     _ = 2^(2+N*6) := by rw [pow_add, pow_mul]; norm_num
+     _ ≤ _ := Nat.pow_le_pow_right (by decide) hexp
+-  have hreal : 4*((N:ℝ)+1)^6 ≤ 2^(100*(N+1)^3+7 : ℕ) := by exact_mod_cast hnat
++  have hreal : 4*((N:ℝ)+1)^6 ≤ 2^(6*N+16+7 : ℕ) := by exact_mod_cast hnat
+   rw [mul_one_div, div_le_one (by positivity)]
+   exact hreal
+ 
+--- a/OAI/Optimization/LinearProgramming/Compression/MinorAssignments.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/MinorAssignments.lean
+@@ -56,7 +56,7 @@
+     ((J.card : ℝ) ≤ (7*(N:ℝ)^2+8)*Real.logb 2 (N+1)) ∧ J.card ≤ paperWidth N := by
+   have hclose (i : NonzeroPairMinor D E) :
+       |minorProxy D E fuel i - Real.logb 2 (abs ((Rat.castHom ℝ) (pairMinorValue D E i.val)))| ≤
+-        1 / 2 ^ (100*(N+1)^3+7 : ℕ) := by
++        1 / 2 ^ (6*N+16+7 : ℕ) := by
+     have he := minorProxy_close D E fuel i
+     have hv : minorTrueLog D E i = Real.logb 2 (abs ((Rat.castHom ℝ) (pairMinorValue D E i.val))) := by
+       unfold minorTrueLog minorMagnitude
+--- a/OAI/Optimization/LinearProgramming/Compression/MinorIndex.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/MinorIndex.lean
+@@ -32,13 +32,13 @@
+     (minor : ι → PairMinorIndex rD rE N) (J : Finset ι) (l : ι → ℝ)
+     (hn : ∀ i ∈ J, v (pairMinorValue D E (minor i)) ≠ 0)
+     (herr : ∀ i ∈ J, |l i - Real.logb 2 (|v (pairMinorValue D E (minor i))|)| ≤
+-      1 / 2 ^ (100 * (N + 1)^3 + 7 : ℕ))
++      1 / 2 ^ (6*N+16 + 7 : ℕ))
+     (hd : IsDissociated l J) :
+     (J.card : ℝ) ≤ (7 * (N : ℝ)^2 + 8) * Real.logb 2 (N + 1) := by
+   classical
+   apply log_bound_of_subset_counts hN J
+   intro t ht hcard
+-  let η : ℝ := 1 / 2 ^ (100 * (N + 1)^3 + 7 : ℕ)
++  let η : ℝ := 1 / 2 ^ (6*N+16 + 7 : ℕ)
+   have hη : 0 ≤ η := by dsimp [η]; positivity
+   have hc : (t.card : ℝ) ≤ ((N : ℝ) + 1)^6 := by exact_mod_cast hcard
+   have hsmall : (t.card : ℝ) * η ≤ 1 := by
+@@ -62,7 +62,7 @@
+     (hN : 1 ≤ N) (hrows : rD + rE = N) (v : R →+* ℝ) (hv : Function.Injective v)
+     (J : Finset (NonzeroPairMinor D E)) (l : NonzeroPairMinor D E → ℝ)
+     (herr : ∀ i ∈ J, |l i - Real.logb 2 (|v (pairMinorValue D E i.val)|)| ≤
+-      1 / 2 ^ (100 * (N + 1)^3 + 7 : ℕ))
++      1 / 2 ^ (6*N+16 + 7 : ℕ))
+     (hd : IsDissociated l J) :
+     (J.card : ℝ) ≤ (7 * (N : ℝ)^2 + 8) * Real.logb 2 (N + 1) := by
+   apply dissociated_minor_card_le D E hN hrows v Subtype.val J l _ herr hd
+--- a/OAI/Optimization/LinearProgramming/Compression/Offline.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/Offline.lean
+@@ -99,7 +99,7 @@
+ theorem exists_bounded_minor_log_assignment {R : Type*} [CommRing R] {rD rE N : ℕ}
+     (D : Matrix (Fin rD) (Fin N) R) (E : Matrix (Fin rE) (Fin N) R)
+     (hN : 1 ≤ N) (hrows : rD + rE = N) (v : R →+* ℝ) (hv : Function.Injective v) :
+-    let B : ℕ := 100 * (N + 1)^3
++    let B : ℕ := 6*N+16
+     let l := fun i : NonzeroPairMinor D E ↦ Real.logb 2 (|v (pairMinorValue D E i.val)|)
+     ∃ f : NonzeroPairMinor D E → ℚ,
+       (∀ i, |f i| ≤ ((2 : ℕ)^offlineValueBits N : ℕ) ∧
+@@ -107,7 +107,7 @@
+       ∀ a : NonzeroPairMinor D E → ℤ, (∑ i, |(a i : ℝ)|) ≤ 4 →
+         |clip B (intForm a (fun i ↦ (f i : ℝ))) - clip B (intForm a l)| ≤ 1 / (2 : ℝ)^B := by
+   classical
+-  let B := 100 * (N + 1)^3
++  let B := 6*N+16
+   let G := 2^(B + 7)
+   let s := (N + 1)^6
+   let l := fun i : NonzeroPairMinor D E ↦ Real.logb 2 (|v (pairMinorValue D E i.val)|)
+--- a/OAI/Optimization/LinearProgramming/Compression/OfflineBudget.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/OfflineBudget.lean
+@@ -92,20 +92,20 @@
+ 
+ /-- An explicit polynomial for the binary logarithm of the final uniform bound. -/
+ def offlineValueBits (N : ℕ) : ℕ :=
+-  let B := 100 * (N + 1) ^ 3
++  let B := 6*N+16
+   let s := (N + 1) ^ 6
+   let k := 4 + (B + 17) * 6
+   let y := s * s + k * (s + 2) * s
+   s + 1 + (B + 9 + (y + 1)) * (s + 2)
+ 
+ theorem offlineValueCap_le_two_pow (N : ℕ) :
+-    let B := 100 * (N + 1) ^ 3
++    let B := 6*N+16
+     let E := 2 ^ (B + 7)
+     let s := (N + 1) ^ 6
+     let C := 2 * E
+     let Y := offlinePointCap s (offlineRowCap B E)
+     offlineValueCap s C Y ≤ 2 ^ offlineValueBits N := by
+-  let B := 100 * (N + 1) ^ 3
++  let B := 6*N+16
+   let E := 2 ^ (B + 7)
+   let s := (N + 1) ^ 6
+   let C := 2 * E
+@@ -128,19 +128,21 @@
+   have hpow (d : ℕ) (hd : d ≤ 21) : u ^ d ≤ u ^ 21 := Nat.pow_le_pow_right hu hd
+   have hp : 0 < u ^ 21 := Nat.pow_pos hu
+   calc
+-    offlineValueBits N = 600 * u ^ 21 + 107 * u ^ 18 + 2400 * u ^ 15 + 426 * u ^ 12 +
+-        2500 * u ^ 9 + 435 * u ^ 6 + 200 * u ^ 3 + 21 := by
+-      change u ^ 6 + 1 + (100 * u ^ 3 + 9 +
+-        (u ^ 6 * u ^ 6 + (4 + (100 * u ^ 3 + 17) * 6) * (u ^ 6 + 2) * u ^ 6 + 1)) *
++    offlineValueBits N = 36 * u ^ 19 + 167 * u ^ 18 + 144 * u ^ 13 + 666 * u ^ 12 +
++        150 * u ^ 7 + 685 * u ^ 6 + 12 * u + 41 := by
++      change u ^ 6 + 1 + (6 * N + 16 + 9 +
++        (u ^ 6 * u ^ 6 + (4 + (6 * N + 16 + 17) * 6) * (u ^ 6 + 2) * u ^ 6 + 1)) *
+         (u ^ 6 + 2) = _
++      dsimp only [u]
+       ring
+     _ ≤ 6689 * u ^ 21 := by
++      have h19 := hpow 19 (by decide)
+       have h18 := hpow 18 (by decide)
+-      have h15 := hpow 15 (by decide)
++      have h13 := hpow 13 (by decide)
+       have h12 := hpow 12 (by decide)
+-      have h9 := hpow 9 (by decide)
++      have h7 := hpow 7 (by decide)
+       have h6 := hpow 6 (by decide)
+-      have h3 := hpow 3 (by decide)
++      have h1 : u ≤ u ^ 21 := by simpa using hpow 1 (by decide)
+       omega
+ 
+ end Compression
+--- a/OAI/Optimization/LinearProgramming/Compression/ParameterRAM.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ParameterRAM.lean
+@@ -21,29 +21,33 @@
+ open RAM Polynomial
+ 
+ /-- The radius in Section 3 as a fixed natural polynomial. -/
+-noncomputable def parameterRadiusPolynomial : Polynomial ℕ := 100*(X+1)^3
++noncomputable def parameterRadiusPolynomial : Polynomial ℕ := 6*X+16
+ 
+ noncomputable def parameterGridExponent : Polynomial ℕ := parameterRadiusPolynomial+7
+ 
+-@[simp] theorem parameterRadiusPolynomial_eval (n : ℕ) : parameterRadiusPolynomial.eval n = 100*(n+1)^3 := by
++@[simp] theorem parameterRadiusPolynomial_eval (n : ℕ) : parameterRadiusPolynomial.eval n = 6*n+16 := by
+   simp [parameterRadiusPolynomial]
+ 
+-@[simp] theorem parameterGridExponent_eval (n : ℕ) : parameterGridExponent.eval n = 100*(n+1)^3+7 := by
++@[simp] theorem parameterGridExponent_eval (n : ℕ) : parameterGridExponent.eval n = 6*n+16+7 := by
+   simp [parameterGridExponent]
+ 
+ /-- A prescribed polynomial is supplied in ascending coefficient order. These two
+-fixed lists are the binomial expansions of `100*(X+1)^3` and `100*(X+1)^3+7`. -/
+-def radiusCoefficients : List ℕ := [100,300,300,100]
++fixed lists are the coefficients of `6*X+16` and `6*X+16+7`. -/
++def radiusCoefficients : List ℕ := [16,6]
+ 
+-def gridExponentCoefficients : List ℕ := [107,300,300,100]
++def gridExponentCoefficients : List ℕ := [23,6]
+ 
+ private theorem radiusCoefficients_value (n : ℕ) :
+     parameterCoefficientValue radiusCoefficients n = parameterRadiusPolynomial.eval n := by
+-  simp [parameterCoefficientValue,radiusCoefficients]; ring
++  rw [parameterRadiusPolynomial_eval]
++  simp only [parameterCoefficientValue,radiusCoefficients,List.foldr_cons,List.foldr_nil]
++  ring
+ 
+ private theorem gridExponentCoefficients_value (n : ℕ) :
+     parameterCoefficientValue gridExponentCoefficients n = parameterGridExponent.eval n := by
+-  simp [parameterCoefficientValue,gridExponentCoefficients]; ring
++  rw [parameterGridExponent_eval]
++  simp only [parameterCoefficientValue,gridExponentCoefficients,List.foldr_cons,List.foldr_nil]
++  ring
+ 
+ /-- The mathematical polynomial denoted by a concrete ascending list. This is used
+ only for the complexity proof. Trailing zeros are allowed. -/
+@@ -83,7 +87,7 @@
+ def parameterStepsFromCoefficients (cs : List ℕ) (n : ℕ) : ℕ :=
+   (4*n+4) + (parameterCoefficientSteps radiusCoefficients +
+     (parameterCoefficientSteps gridExponentCoefficients + (parameterCoefficientSteps cs +
+-    (1 + ((6*(100*(n+1)^3+7)+7) + (6*parameterCoefficientValue cs n+7))))))
++    (1 + ((6*(6*n+16+7)+7) + (6*parameterCoefficientValue cs n+7))))))
+ 
+ noncomputable def parameterBlockSteps (p : Polynomial ℕ) (n : ℕ) : ℕ :=
+   parameterStepsFromCoefficients (parameterCoefficients p) n
+@@ -98,10 +102,10 @@
+ 
+ /-- All returned values and the two binary streams. Digits are in most-significant-first order. -/
+ structure ParameterOutput {K : Type*} [Field K] (p : Polynomial ℕ) (n : ℕ) (t : Memory K) : Prop where
+-  radius : t.data 2 = ((100*(n+1)^3:ℕ):K)
+-  gridExponent : t.data 3 = ((100*(n+1)^3+7:ℕ):K)
++  radius : t.data 2 = ((6*n+16:ℕ):K)
++  gridExponent : t.data 3 = ((6*n+16+7:ℕ):K)
+   cutoffExponent : t.data 4 = ((p.eval n : ℕ) : K)
+-  grid : t.data 5 = (2:K)^(100*(n+1)^3+7)
++  grid : t.data 5 = (2:K)^(6*n+16+7)
+   cutoff : t.data 6 = (2:K)^(p.eval n)
+   gridDigits : ∀ r≤parameterGridExponent.eval n, t.index (8+r) = if r=0 then 1 else 0
+   cutoffDigits : ∀ r≤p.eval n, t.index ((8+parameterGridExponent.eval n+1)+r) = if r=0 then 1 else 0
+--- a/OAI/Optimization/LinearProgramming/Compression/ProxyFuel.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ProxyFuel.lean
+@@ -63,7 +63,7 @@
+ in the number of generators and without reference to any unobserved minor. -/
+ theorem manuscript_commit_inputWidth (N j : ℕ) (hj : j ≤ (N+1)^6) :
+     let w := (N+1)^6
+-    let B := 100*(N+1)^3
++    let B := 6*N+16
+     let E := 2^(B+7)
+     let C := max (requestCutoff (j+1)*E) (2*E)
+     let H := (B+17+4*C)*(E*C^4)
+--- a/OAI/Optimization/LinearProgramming/Compression/ProxyFuelQueries.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ProxyFuelQueries.lean
+@@ -19,16 +19,27 @@
+     fiberProjectionBudget k w H ≤ fiberProjectionBudget k w' H :=
+   Finset.sum_le_sum_of_subset (Finset.range_mono (Nat.succ_le_succ h))
+ 
++/-- The rounding input width is monotone in the radius, so the bound at the radius
++`paperRadius N` is dominated by the one at the old radius used in the cutoff exponent. -/
++private theorem proxyRoundingInput_mono_radius (w : ℕ) {B B' : ℕ} (h : B ≤ B') :
++    proxyRoundingInputFormula w B ≤ proxyRoundingInputFormula w B' := by
++  unfold proxyRoundingInputFormula
++  dsimp only
++  gcongr
++
+ /-- The attainable query width in the commitment to the generator coordinates. -/
+ theorem manuscript_commit_fuel (N j : ℕ) (hj : j ≤ paperWidth N) :
+     let M := (j+1)*fiberProjectionBudget j (paperWidth N) (epochHeightFor N j)+1
+     paperRadius N+7+(j+1)+queryCoefficientWidth (j+1) M ≤ manuscriptProxyFuel N := by
+   dsimp only
++  refine (Nat.add_le_add_right (Nat.add_le_add_right (Nat.add_le_add_right
++    (paperRadius_le_cube N) 7) _) _).trans ?_
+   apply manuscript_rounding_fuel
+   · have := paperWidth_le_pow N; omega
+   · have h := manuscript_commit_inputWidth N j (hj.trans (paperWidth_le_pow N))
+     dsimp only at h
+-    refine (Nat.size_le_size ?_).trans h
++    refine (Nat.size_le_size ?_).trans (h.trans (proxyRoundingInput_mono_radius _
++      (show 6*N+16 ≤ 100*(N+1)^3 from paperRadius_le_cube N)))
+     exact Nat.add_le_add_right (Nat.mul_le_mul_left _
+       (fiberProjectionBudget_mono_width j _ (paperWidth_le_pow N))) 1
+ 
+@@ -38,6 +49,8 @@
+     let M := (d+2)*(requestCutoff d+3)
+     paperRadius N+7+(d+1)+queryCoefficientWidth (d+1) M ≤ manuscriptProxyFuel N := by
+   dsimp only
++  refine (Nat.add_le_add_right (Nat.add_le_add_right (Nat.add_le_add_right
++    (paperRadius_le_cube N) 7) _) _).trans ?_
+   apply manuscript_rounding_fuel
+   · have := paperWidth_le_pow N; omega
+   · exact manuscript_request_inputWidth N j (hj.trans (paperWidth_le_pow N))
+@@ -85,6 +98,7 @@
+     let args := requestGridArgs z last (paperGrid N) mid
+     (2 : ℤ)^(paperRadius N+7) * (|args.2| + ∑ i, |args.1 i|) ≤ 2^manuscriptProxyFuel N := by
+   apply gridArgs_scaled_le_pow w oracle z last hshort mid hmid
++  have hr : 6*N+16 ≤ 100*(N+1)^3 := paperRadius_le_cube N
+   unfold manuscriptProxyFuel manuscriptProxyFuelFormula paperRadius
+   dsimp only
+   have hj := hj.trans (paperWidth_le_pow N)
+--- a/OAI/Optimization/LinearProgramming/Compression/ProxyHomogeneousFuel.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ProxyHomogeneousFuel.lean
+@@ -21,7 +21,8 @@
+   have hprod : u ≤ u*((w+2)+2) := Nat.le_mul_of_pos_right _ (by omega)
+   have hQ : u*((w+2)+2) ≤ Q := by unfold Q proxyQueryWidthFormula; dsimp only [u]; omega
+   have hd : d ≤ w+1 := hd.trans (Nat.add_le_add_right (paperWidth_le_pow N) 1)
+-  change (B+7)+(2*(B+7)+8*d+30) ≤ (B+7)+(w+2)+Q+(4*w+2*B+40)
++  have hB : paperRadius N ≤ B := paperRadius_le_cube N
++  change (paperRadius N+7)+(2*(paperRadius N+7)+8*d+30) ≤ (B+7)+(w+2)+Q+(4*w+2*B+40)
+   omega
+ 
+ /-- Consequently even the actual rescaled integer L¹ row, multiplied by the scale
+--- a/OAI/Optimization/LinearProgramming/Compression/ProxyNormalHeader.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ProxyNormalHeader.lean
+@@ -20,7 +20,7 @@
+   omega
+ 
+ theorem proxyParameter_exponents_safe (p : Polynomial ℕ) (N H : ℕ) (hH : parameterBits p N ≤ H)
+-    (j : ℕ) (hj : j ≤ max (p.eval N) (100*(N+1)^3+7)) : ratBits (j:ℚ) ≤ H := by
++    (j : ℕ) (hj : j ≤ max (p.eval N) (6*N+16+7)) : ratBits (j:ℚ) ≤ H := by
+   apply proxyParameter_nat_safe p N H hH
+   apply hj.trans
+   apply max_le <;> unfold parameterCounterCap <;> simp only [parameterGridExponent_eval] <;> omega
+@@ -42,7 +42,7 @@
+ 
+ def normalProxyHeaderSteps (cs : List ℕ) (N g : ℕ) : ℕ :=
+   (7*g+15) + (4 + (parameterStepsFromCoefficients cs N +
+-    (20 + ((4*parameterCoefficientValue cs N+4)+(4*(100*(N+1)^3+7)+4)))))
++    (20 + ((4*parameterCoefficientValue cs N+4)+(4*(6*N+16+7)+4)))))
+ 
+ /-- The source vector is physically disjoint from the initializer's scalar workspace.
+ The bit driver's dimension, generator count, membership bit and rank occupy addresses
+@@ -50,9 +50,9 @@
+ structure NormalProxyHeader {K : Type*} (N g member rank fuel : ℕ) (s t : Memory K) : Prop where
+   count : t.index 0 = g+1
+   cutoff : t.index 1 = fuel
+-  precision : t.index 2 = 100*(N+1)^3+7
++  precision : t.index 2 = 6*N+16+7
+   base : t.index 3 = g+8
+-  protectedEnd : t.index 4 = (8+(100*(N+1)^3+7)+1)+fuel+1
++  protectedEnd : t.index 4 = (8+(6*N+16+7)+1)+fuel+1
+   cacheCounter : t.index 60 = 0
+   dimension : t.index 90 = N
+   generators : t.index 91 = g
+@@ -95,7 +95,7 @@
+     ∃ t, Block.Eval (Memory.AllData P) (normalProxyHeader cs) s (normalProxyHeaderSteps cs N g) t ∧
+       NormalProxyHeader N g member rank (p.eval N) s t := by
+   let fuel := p.eval N
+-  let prec := 100*(N+1)^3+7
++  let prec := 6*N+16+7
+   obtain ⟨a,ea,copied,_,ai,_⟩ := moveProxyInputBlock_spec P s g hg hs
+   have keep (i : ℕ) (hi : i < 4) : a.index i = s.index i :=
+     ai i (by omega) (by omega) (by omega) (by omega)
+--- a/OAI/Optimization/LinearProgramming/Compression/ProxyNumericCache.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ProxyNumericCache.lean
+@@ -18,7 +18,7 @@
+ def numericProxyCache : Fragment :=
+   Fragment.seq (.ofBlock (normalProxyHeader manuscriptProxyFuelCoefficients)) MinorProxyCache.fromPositive
+ 
+-def numericCachePrecision (N : ℕ) := 100*(N+1)^3+7
++def numericCachePrecision (N : ℕ) := 6*N+16+7
+ 
+ def numericCacheAddressEnd (N : ℕ) :=
+   (8+numericCachePrecision N+1)+manuscriptProxyFuel N+1
+--- a/OAI/Optimization/LinearProgramming/Compression/RequestGraphInputSize.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/RequestGraphInputSize.lean
+@@ -43,8 +43,9 @@
+   rw [paperInputPolynomial_eval]
+   simp only [paperGrid,Nat.size_pow]
+   have hd : n+1 ≤ (N+1)^6+1 := Nat.add_le_add_right (hn.trans (paperWidth_le_pow N)) 1
++  have hr := paperRadius_le_cube N
+   change 2*((paperRadius N+7)+1)+(n+1)*(6*L+22)+2 ≤
+-    2*((paperRadius N+7)+1)+((N+1)^6+1)*(6*RequestScreen.requestRoundBitsFormula ((N+1)^6+1)+22)+2
++    2*((100*(N+1)^3+7)+1)+((N+1)^6+1)*(6*RequestScreen.requestRoundBitsFormula ((N+1)^6+1)+22)+2
+   have hw := round_width_mono hd
+   dsimp only [L]
+   gcongr
+--- a/OAI/Optimization/LinearProgramming/Compression/Restart.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/Restart.lean
+@@ -13,7 +13,7 @@
+     (hN : 1 ≤ N) (hrows : rD + rE = N)
+     (l : NonzeroPairMinor D E → ℝ)
+     (herr : ∀ i, |l i - Real.logb 2 (|((pairMinorValue D E i.val : ℚ) : ℝ)|)| ≤
+-      1 / 2 ^ (100 * (N + 1)^3 + 7 : ℕ))
++      1 / 2 ^ (6*N+16 + 7 : ℕ))
+     [DecidableEq (NonzeroPairMinor D E)]
+     (request : MinorRequest (NonzeroPairMinor D E)) (htest : RestartTest l request)
+     (indices : List (NonzeroPairMinor D E)) :
+--- a/OAI/Optimization/LinearProgramming/Compression/RoundingBudgets.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/RoundingBudgets.lean
+@@ -55,7 +55,7 @@
+   exact bmul (badd (bits g) (bconst _ 3)) (badd (cutoff (uadd g (uconst _ 1))) (bconst _ 3))
+ 
+ private noncomputable def radius (n : U e a) : U e (fun x => paperRadius (a x)) :=
+-  umul (uconst e 100) (upow (uadd n (uconst e 1)) 3)
++  uadd (umul (uconst e 6) n) (uconst e 16)
+ 
+ private noncomputable def width (n : U e a) : U e (fun x => paperWidth (a x)) :=
+   uadd (umul (uadd (umul (uconst e 7) (upow n 2)) (uconst e 8)) n) (uconst e 1)
+--- a/OAI/Optimization/LinearProgramming/Geometry/Admissible.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/Admissible.lean
+@@ -87,7 +87,7 @@
+   obtain ⟨u, hu, hxu⟩ := hx
+   obtain ⟨v, hv, hyv⟩ := hy
+   have hB : (2 : ℝ) ≤ (geoCutoff n : ℝ) := by
+-    exact_mod_cast (show 2 ≤ geoCutoff n by unfold geoCutoff; nlinarith [Nat.zero_le (n ^ 2), Nat.zero_le (n ^ 3)])
++    exact_mod_cast (show 2 ≤ geoCutoff n by unfold geoCutoff; omega)
+   have h₁ := registered_dot_bound horth hu hv _ hB hc
+   change |u ⬝ᵥ v| ≤ 8*n*geoDelta n at h₁
+   have h₂ := dotProduct_rounding_error u v x y (geoDelta n) (geoDelta n) hx₁ hv.abs_le_one hxu hyv
+--- a/OAI/Optimization/LinearProgramming/Geometry/AfterPrefix.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/AfterPrefix.lean
+@@ -60,19 +60,18 @@
+ 
+ set_option exponentiation.threshold 512 in
+ theorem afterPrefixBits_dimension (r n : ℕ) :
+-    afterPrefixBits r n (8+2*(100*(n+1)^3+4)) ≤
++    afterPrefixBits r n (8+2*(6*n+16+4)) ≤
+       polyBound ((640+10^50*1300^15)*217^105) 315 (r+n) := by
+   let z := r+n+1
+   have hz : 0 < z := by dsimp [z]; omega
+   have hn : n+1 ≤ z := by dsimp [z]; omega
+-  have hh : (n+1)^3 ≤ z^3 := Nat.pow_le_pow_left hn 3
+   have h₀ : z ≤ z^3 := by simpa using Nat.pow_le_pow_right hz (by decide : 1≤3)
+   have h₁ : 1 ≤ z^3 := Nat.succ_le_iff.mpr (pow_pos hz _)
+-  have hsz : r+n+(8+2*(100*(n+1)^3+4))+1 ≤ 217*z^3 := by
++  have hsz : r+n+(8+2*(6*n+16+4))+1 ≤ 217*z^3 := by
+     have linear : r+n+1≤z^3 := h₀
+     omega
+   calc
+-    _ ≤ (640+10^50*1300^15)*(r+n+(8+2*(100*(n+1)^3+4))+1)^105 := afterPrefixBits_polynomial ..
++    _ ≤ (640+10^50*1300^15)*(r+n+(8+2*(6*n+16+4))+1)^105 := afterPrefixBits_polynomial ..
+     _ ≤ (640+10^50*1300^15)*(217*z^3)^105 := Nat.mul_le_mul_left _ (Nat.pow_le_pow_left hsz 105)
+     _ = _ := by unfold polyBound; rw [mul_pow, ← pow_mul, Nat.mul_assoc]
+ 
+--- a/OAI/Optimization/LinearProgramming/Geometry/GeneratorService.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/GeneratorService.lean
+@@ -146,7 +146,7 @@
+     (E : Matrix (Fin s) (Fin N) ℚ) (hN : 1 ≤ N) (hrows : r + s = N)
+     (l : NonzeroPairMinor D E → ℝ)
+     (ha : ∀ i, |l i - Real.logb 2 (|((pairMinorValue D E i.val : ℚ) : ℝ)|)| ≤
+-      1 / 2 ^ (100 * (N + 1)^3 + 7 : ℕ)) (J : Finset (NonzeroPairMinor D E))
++      1 / 2 ^ (6*N+16 + 7 : ℕ)) (J : Finset (NonzeroPairMinor D E))
+     (hd : IsDissociated l J) : J.card ≤ ⌈(7 * (N : ℝ)^2 + 8) * Real.logb 2 (N + 1)⌉₊ := by
+   have h := dissociated_nonzeroPairMinor_card_le D E hN hrows (Rat.castHom ℝ)
+     Rat.cast_injective J l (fun i _ => ha i) hd
+--- a/OAI/Optimization/LinearProgramming/Geometry/LabelBasis.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/LabelBasis.lean
+@@ -14,7 +14,7 @@
+ variable {r s n : ℕ}
+ 
+ /-- The clipping cutoff used for all minor requests of a system on `n` coordinates. -/
+-def geoCutoff (n : ℕ) : ℕ := 100 * (n + 1)^3
++def geoCutoff (n : ℕ) : ℕ := 6*n+16
+ 
+ /-- The additive error budget on compressed magnitudes. -/
+ noncomputable def geoDelta (n : ℕ) : ℝ := (2 : ℝ) ^ (-(geoCutoff n : ℝ))
+--- a/OAI/Optimization/LinearProgramming/Geometry/LabelHeader.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/LabelHeader.lean
+@@ -17,15 +17,14 @@
+ private def alloc : List GramAllocOp :=
+   [.copy 129 202, .copy 130 204, .copy 131 206, .copy 132 207, .copy 133 208,
+    .copy 136 201, .copy 146 205, .copy 147 200, .copy 148 203,
+-   .set 14 0, .set 209 0, .set 210 1, .set 211 3, .set 212 6, .set 213 100,
+-   .reserve 214 210 202 210, .reserve 215 210 204 210, .reserve 216 209 215 215,
+-   .reserve 217 209 216 215, .reserve 138 209 217 213,
++   .set 14 0, .set 209 0, .set 210 1, .set 211 3, .set 212 6, .set 213 16,
++   .reserve 214 210 202 210, .reserve 138 213 212 204,
+    .reserve 134 208 211 204, .reserve 143 134 202 204, .reserve 144 143 204 210,
+    .reserve 140 201 202 210, .reserve 141 140 212 204, .reserve 142 141 202 210,
+    .reserve 145 142 204 214, .copy 149 144, .set 128 0, .copy 135 134, .copy 137 136, .set 139 0]
+ 
+-/-- The serialized instructions read dimensions and locations at run time. The degree-three
+-rounding precision is computed in the address bank. Reservations take time depending only
++/-- The serialized instructions read dimensions and locations at run time. The linear
++rounding precision `6n+16` is computed in the address bank. Reservations take time depending only
+ on the number of newly allocated cells, independently of the numerical base pointers. -/
+ def prepareHeader : Block := gramAllocCode alloc
+ 
+@@ -34,7 +33,7 @@
+ /-- Exactly the direct address registers that may change. The scalar bank is untouched. -/
+ def modifiedHeaderRegisters : List ℕ :=
+   [8,9,14,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,
+-    209,210,211,212,213,214,215,216,217]
++    209,210,211,212,213,214]
+ 
+ theorem prepareHeader_frame {K : Type} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+     {S : Memory K → Prop} {m t : Memory K} {c : ℕ} (e : Block.Eval S prepareHeader m c t)
+@@ -57,7 +56,7 @@
+     gramAllocIndex f alloc 135 = f 208+3*f 204 ∧
+     gramAllocIndex f alloc 136 = f 201 ∧
+     gramAllocIndex f alloc 137 = f 201 ∧
+-    gramAllocIndex f alloc 138 = 100*(f 204+1)^3 ∧
++    gramAllocIndex f alloc 138 = 6*f 204+16 ∧
+     gramAllocIndex f alloc 139 = 0 := by
+   repeat' apply And.intro
+   all_goals try rfl
+--- a/OAI/Optimization/LinearProgramming/Geometry/OracleBudget.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/OracleBudget.lean
+@@ -13,24 +13,25 @@
+ 
+ open RAM
+ 
+-/-- Coefficient contributed by the row collector after substituting the cubic precision. -/
++/-- Coefficient contributed by the row collector after bounding the precision `6n+16` by `100*z^3`. -/
+ def prefixWidthCoefficient : ℕ := 200000000000000 * 101^5
+ 
+ /-- Coefficient contributed by the Gram and Frank–Wolfe stages. -/
+ def postWidthCoefficient : ℕ := (640+10^50*1300^15)*217^105
+ 
+ theorem pivotTime_bound (r n C : ℕ) :
+-    r*PivotPrefixRAM.stepCost n (100*(n+1)^3) C ≤ r*C+3443*(r+n+1)^5 := by
++    r*PivotPrefixRAM.stepCost n (6*n+16) C ≤ r*C+3443*(r+n+1)^5 := by
+   let z := r+n+1
+   have hz : 0<z := by dsimp [z]; omega
+   have hr : r≤z := by dsimp [z]; omega
+   have hn : n≤z := by dsimp [z]; omega
+   have hn' : n+1≤z := by dsimp [z]; omega
+-  have hb : (100*(n+1)^3) ≤ 100*z^3 := Nat.mul_le_mul_left _ (Nat.pow_le_pow_left hn' 3)
+-  have linear : 32*(100*(n+1)^3)+210 ≤ 32*(100*z^3)+210 :=
++  have hz₃ : z ≤ z^3 := by simpa using Nat.pow_le_pow_right hz (show 1≤3 by decide)
++  have hb : (6*n+16) ≤ 100*z^3 := by omega
++  have linear : 32*(6*n+16)+210 ≤ 32*(100*z^3)+210 :=
+     Nat.add_le_add_right (Nat.mul_le_mul_left 32 hb) 210
+   calc
+-    _ = r*C + r*(n*(32*(100*(n+1)^3)+210)+33) := by
++    _ = r*C + r*(n*(32*(6*n+16)+210)+33) := by
+       unfold PivotPrefixRAM.stepCost
+       rw [Nat.add_assoc C, Nat.mul_add r C]
+     _ ≤ r*C + z*(z*(32*(100*z^3)+210)+33) :=
+@@ -38,7 +39,7 @@
+     _ ≤ _ := Nat.add_le_add_left (BudgetAlgebra.cubic_prefix z hz) (r*C)
+ 
+ theorem pivotWidth_bound (r n L extra : ℕ) :
+-    r*PivotPrefixRAM.stepWidth n L (100*(n+1)^3) extra ≤
++    r*PivotPrefixRAM.stepWidth n L (6*n+16) extra ≤
+       r*extra+prefixWidthCoefficient*(r+n+L+1)^16 := by
+   let z := r+n+L+1
+   have hz : 0<z := by dsimp [z]; omega
+@@ -46,19 +47,19 @@
+   have hn : n+1≤z := by dsimp [z]; omega
+   have ha : n+L+1≤z := by dsimp [z]; omega
+   have hz₃ : z ≤ z^3 := by simpa using Nat.pow_le_pow_right hz (show 1≤3 by decide)
+-  have hb : (100*(n+1)^3) ≤ 100*z^3 := Nat.mul_le_mul_left _ (Nat.pow_le_pow_left hn 3)
+-  have hχ : n+L+(100*(n+1)^3)+1 ≤ 101*z^3 := by omega
+-  have hinc := (PivotStageRAM.widthIncrement_le n L (100*(n+1)^3)).trans
++  have hb : (6*n+16) ≤ 100*z^3 := by omega
++  have hχ : n+L+(6*n+16)+1 ≤ 101*z^3 := by omega
++  have hinc := (PivotStageRAM.widthIncrement_le n L (6*n+16)).trans
+     (Nat.mul_le_mul_left _ (Nat.pow_le_pow_left hχ 5))
+   calc
+-    _ = r*extra + r*PivotStageRAM.widthIncrement n L (100*(n+1)^3) := Nat.mul_add ..
++    _ = r*extra + r*PivotStageRAM.widthIncrement n L (6*n+16) := Nat.mul_add ..
+     _ ≤ r*extra + z*(200000000000000*(101*z^3)^5) := Nat.add_le_add_left (Nat.mul_le_mul hr hinc) _
+     _ = _ := congrArg (fun a => r*extra+a) (BudgetAlgebra.fifth_cube_product z 200000000000000 101)
+ 
+ /-- The caller may price its determinant and reply subroutine independently. -/
+ theorem time_budget {r n N C c e post : ℕ} (hsize : r+n≤N) (hC : C≤polyBound c e N)
+     (hpost : post≤polyBound 510000000 9 (r+n)) :
+-    r*PivotPrefixRAM.stepCost n (100*(n+1)^3) C+post+12 ≤
++    r*PivotPrefixRAM.stepCost n (6*n+16) C+post+12 ≤
+       polyBound (c+510004000) (max (e+1) 9) N :=
+   BudgetAlgebra.combined_time hsize hC (pivotTime_bound r n C) hpost
+ 
+@@ -67,7 +68,7 @@
+ theorem width_budget {r n N L extra H l d x f post postExponent : ℕ} (hsize : r+n ≤ N)
+     (hL : L≤polyBound l d N) (hX : extra≤polyBound x f N)
+     (hpost : post≤polyBound postWidthCoefficient postExponent (r+n)) :
+-    max (H+r*PivotPrefixRAM.stepWidth n L (100*(n+1)^3) extra) post ≤
++    max (H+r*PivotPrefixRAM.stepWidth n L (6*n+16) extra) post ≤
+       H+polyBound (x+prefixWidthCoefficient*(l+1)^16+postWidthCoefficient)
+         (max (f+1) (max (max d 1 * 16) postExponent)) N :=
+   BudgetAlgebra.combined_width hsize hL hX (pivotWidth_bound r n L extra) hpost
+--- a/OAI/Optimization/LinearProgramming/Geometry/SubspaceDecision.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/SubspaceDecision.lean
+@@ -26,7 +26,7 @@
+ def SubspaceRequestCorrect (D : Matrix (Fin r) (Fin n) ℚ) (E : Matrix (Fin s) (Fin n) ℚ)
+     (request : MinorRequest (NonzeroPairMinor D E)) (F : ℕ) : Prop :=
+   ∃ l : NonzeroPairMinor D E → ℝ,
+-    (∀ i, |l i - pairMinorLog D E i| ≤ 1 / 2 ^ (100 * (n + 1)^3 + 7 : ℕ)) ∧
++    (∀ i, |l i - pairMinorLog D E i| ≤ 1 / 2 ^ (6*n+16 + 7 : ℕ)) ∧
+     RestartTest l request ∧
+     ∀ J : Finset (NonzeroPairMinor D E), IsDissociated l J →
+       ∃ f : NonzeroPairMinor D E → ℚ, AdmissibleMinorAssignment D E F f ∧
+--- a/OAI/Optimization/LinearProgramming/Geometry/Triangular.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/Triangular.lean
+@@ -51,10 +51,10 @@
+       linarith [ih (by omega), coeff p (by omega)]
+   exact pref k le_rfl
+ 
+-/-- The paper's dimension choice makes the rounded projection error smaller
++/-- The linear cutoff `6n+16` makes the rounded projection error smaller
+ than half the separation tolerance; all constants are retained. -/
+ theorem projection_precision (n : ℕ) (hn : 0 < n) :
+-    30 * (n : ℝ) ^ 3 * 4 ^ n * (2 : ℝ) ^ (-(100 * (n + 1) ^ 3 : ℕ) : ℝ) ≤
++    30 * (n : ℝ) ^ 3 * 4 ^ n * (2 : ℝ) ^ (-(6*n+16 : ℕ) : ℝ) ≤
+       1 / (2000 * (n : ℝ)) := by
+   have hpow (m : ℕ) : m ≤ 2 ^ m := by
+     induction m with
+@@ -64,17 +64,17 @@
+       have hpos : 0 < 2 ^ m := by positivity
+       omega
+   have hn4 : n ^ 4 ≤ (2 ^ n) ^ 4 := Nat.pow_le_pow_left (hpow n) 4
+-  have hbig : 60000 * n ^ 4 * 4 ^ n ≤ 2 ^ (100 * (n + 1) ^ 3) := by
++  have hbig : 60000 * n ^ 4 * 4 ^ n ≤ 2 ^ (6*n+16) := by
+     calc
+       60000 * n ^ 4 * 4 ^ n ≤ 2 ^ 16 * (2 ^ n) ^ 4 * (2 ^ 2) ^ n := by gcongr <;> norm_num
+       _ = 2 ^ (16 + n * 4 + 2 * n) := by rw [← pow_mul, ← pow_mul, ← pow_add, ← pow_add]
+       _ ≤ _ := by
+         apply Nat.pow_le_pow_right (by decide)
+-        nlinarith [Nat.zero_le (n ^ 3), Nat.zero_le (n ^ 2)]
++        omega
+   rw [Real.rpow_neg (by norm_num : (0 : ℝ) ≤ 2), Real.rpow_natCast]
+-  have hp : (0 : ℝ) < 2 ^ (100 * (n + 1) ^ 3) := by positivity
++  have hp : (0 : ℝ) < 2 ^ (6*n+16) := by positivity
+   have hn' : 0 < (n : ℝ) := by exact_mod_cast hn
+-  have hb : 60000 * (n : ℝ) ^ 4 * 4 ^ n ≤ (2 : ℝ) ^ (100 * (n + 1) ^ 3) := by
++  have hb : 60000 * (n : ℝ) ^ 4 * 4 ^ n ≤ (2 : ℝ) ^ (6*n+16) := by
+     exact_mod_cast hbig
+   rw [← div_eq_mul_inv, div_le_div_iff₀ hp (by positivity)]
+   nlinarith only [hb]
+--- a/OAI/Optimization/LinearProgramming/OracleSpec/Compression.lean
++++ b/OAI/Optimization/LinearProgramming/OracleSpec/Compression.lean
+@@ -35,7 +35,7 @@
+ 
+ def clip (B z : ℝ) : ℝ := max (-B) (min z B)
+ 
+-def threshold (n : ℕ) : ℕ := 100 * (n + 1)^3
++def threshold (n : ℕ) : ℕ := 6*n+16
+ 
+ def entries {r n : ℕ} (M : Matrix (Fin r) (Fin n) ℚ) : List ℚ :=
+   (List.ofFn fun i => List.ofFn fun j => M i j).flatten

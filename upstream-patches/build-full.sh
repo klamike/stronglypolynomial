@@ -26,4 +26,7 @@ patch -p1 < "$HERE/full-width.patch"
 # Optional second patch: lower the constants of upstream's price search
 # (query bound x^1510 -> x^989). Applies on top of full-width.patch.
 if [ "${CLOCK:-1}" = 1 ]; then patch -p1 < "$HERE/clock.patch"; fi
+# Optional third patch: lower the precision radius 100(N+1)^3 -> 6N+16. Applies on top of
+# the first two.
+if [ "${CLOCK:-1}" = 1 ] && [ "${RADIUS:-1}" = 1 ]; then patch -p1 < "$HERE/radius.patch"; fi
 lake build OAI.Optimization.LinearProgramming.Optimization OAI.Optimization.LinearProgramming.Feasibility
