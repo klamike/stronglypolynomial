@@ -5,6 +5,7 @@ import SPLP.Cost
 import SPLP.VertexRun
 import SPLP.Eval
 import SPLP.Descent
+import SPLP.Approx
 
 /-!
 # Summary: the price search with fewer probes
@@ -22,6 +23,10 @@ the same expert pool but different numerical constants and a sharper accounting.
 * `price_search_k5_total`, `price_search_k6_total`: exponents `39` and `35` with experts of
   arity `5` and `6`.
 * `preprint_exponent`: the preprint's constants give an exponent between `59` and `60`.
+* `price_search_k4_approx_total`: the same with approximately cleared markets. Every proposal
+  may minimize the potential for weights within total distance `ζ · (total wealth)` of the
+  true wealth, with `ζ ≥ 2^-12 / (2N)^46` depending only on `N`; the root makes `2 r₀` probes
+  and the run makes at most `4 r₀ (2N)^46` label queries. Wealth is still rounded.
 -/
 
 namespace SPLP
@@ -271,5 +276,58 @@ theorem lockstep_2R (R : ℕ) (H : Hyp ι (Fin (2 * R + 1))) (z : ℕ → ι →
   rw [hs]
   push_cast
   linarith
+
+/-! ### Approximately cleared markets
+
+`approxMarket val ζ` (see `SPLP/Defs.lean` and `SPLP/Approx.lean`) lets a proposal minimize the
+potential for any nonnegative weights within total distance `ζ` times the total wealth of the
+true wealth. `Exec.ValidWith (approxMarket val ζ) A` is `Exec.Valid A` with this weaker market
+condition; for `ζ = 0` the two agree (`Exec.valid_of_approx_zero`, `Exec.Valid.approx`). -/
+
+omit [Nonempty ι] in
+/-- For good constants and any number of root probes, a run with approximately cleared
+markets exists against every labelling rule (an exact run is one). -/
+theorem Consts.exists_approx_run {k : ℕ} (K : Consts k) (hK : K.Good) (hk : 0 < k)
+    (val : V → ℝ) (r₀' : ℕ) {ζ : ℝ} (hζ : 0 ≤ ζ)
+    (oracle : List ℕ → (ι → ℝ) → (ι → Bool)) (hist₀ : ℕ → ι → ℝ) :
+    ∃ X : Exec ι (Expert ι V k (K.depth hK (Fintype.card ι))),
+      X.ValidWith (approxMarket val ζ) (K.algRoot ι V val r₀') 0 hist₀ (fun _ => 1) ∧
+        X.LabelsFrom oracle [] := by
+  have hc0 : 0 < (K.algRoot ι V val r₀').c := (K.params hK ι V val).hc0
+  have hc1 : (K.algRoot ι V val r₀').c < 1 := (K.params hK ι V val).hc1
+  have hη0 : 0 < (K.algRoot ι V val r₀').η := (K.params hK ι V val).hη0
+  have hη1 : (K.algRoot ι V val r₀').η < 1 := (K.params hK ι V val).hη1
+  have hrnd : ∀ x : ℝ, 0 < x → (1 - (K.params hK ι V val).ep) * x
+      ≤ (K.algRoot ι V val r₀').rnd x ∧ (K.algRoot ι V val r₀').rnd x ≤ x :=
+    (K.params hK ι V val).hrnd
+  obtain ⟨X, hX, hL⟩ := exists_valid (D := K.depth hK (Fintype.card ι)) hk
+    (K.algRoot ι V val r₀') hc0 hc1 hη0 hη1 (K.params hK ι V val).hep1 hrnd oracle hist₀
+  exact ⟨X, Exec.Valid.approx (K.algRoot ι V val r₀') hζ hc0 hc1 hη0 hη1
+    (K.params hK ι V val).hep1 hrnd X 0 hist₀ _ hX (fun _ => one_pos), hL⟩
+
+/-- **Arity 4 with approximately cleared markets, end to end.** Let the root make `2 r₀`
+probes and let `ζ = K4.ζ 46 N ≥ 2^-12 / (2N)^46`. Against any rule answering label queries
+there is a run; **every** run in which each proposal minimizes the potential for weights
+within total distance `ζ · (total wealth)` of the true wealth returns prices meeting all
+demands of every hypothesis consistent with the labels it received, and makes at most
+`4 r₀ (2N)^46` label queries. -/
+theorem price_search_k4_approx_total (val : V → ℝ) (hist₀ : ℕ → ι → ℝ) :
+    (∀ oracle : List ℕ → (ι → ℝ) → (ι → Bool),
+      ∃ X : Exec ι (Expert ι V 4 (K4.depth K4_good (Fintype.card ι))),
+        X.ValidWith (approxMarket val (K4.ζ 46 (Fintype.card ι)))
+          (K4.algRoot ι V val (2 * K4.r₀ ι V (K4.depth K4_good (Fintype.card ι)))) 0 hist₀
+          (fun _ => 1) ∧ X.LabelsFrom oracle []) ∧
+    (∀ X : Exec ι (Expert ι V 4 (K4.depth K4_good (Fintype.card ι))),
+      X.ValidWith (approxMarket val (K4.ζ 46 (Fintype.card ι)))
+          (K4.algRoot ι V val (2 * K4.r₀ ι V (K4.depth K4_good (Fintype.card ι)))) 0 hist₀
+          (fun _ => 1) →
+        (∀ H : Hyp ι V, X.Consistent val H → ∀ s ∈ H.S, val (H.a s) ≤ sp X.x s) ∧
+        X.queries ≤ 4 * K4.r₀ ι V (K4.depth K4_good (Fintype.card ι))
+          * (2 * Fintype.card ι) ^ 46) ∧
+    1 / (4096 * (((2 * Fintype.card ι) ^ 46 : ℕ) : ℝ)) ≤ K4.ζ 46 (Fintype.card ι) :=
+  ⟨fun oracle => K4.exists_approx_run K4_good (by norm_num) val _
+      (K4.ζ_pos K4_good 46 Fintype.card_pos).le oracle hist₀,
+   fun X hX => price_search_k4_approx val X hist₀ hX,
+   K4_ζ_ge _ Fintype.card_pos⟩
 
 end SPLP

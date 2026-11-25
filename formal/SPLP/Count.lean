@@ -34,9 +34,10 @@ theorem below_le (r : ℕ) (hr : 2 ≤ r) (d : ℕ) : below r d + 2 ≤ 2 * r ^ 
     simp only [below]
     omega
 
-theorem queries_of_valid (A : Alg V) (X : Exec ι (Expert ι V k D)) :
-    ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ), X.Valid A l hist wIn → 0 < l →
-      X.queries = below A.r (D - l) := by
+theorem queries_of_validWith (M : MarketCond ι V k D) (A : Alg V)
+    (X : Exec ι (Expert ι V k D)) :
+    ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ), X.ValidWith M A l hist wIn →
+      0 < l → X.queries = below A.r (D - l) := by
   induction X with
   | leaf x wOut =>
     intro l hist wIn hv _
@@ -54,11 +55,10 @@ theorem queries_of_valid (A : Alg V) (X : Exec ι (Expert ι V k D)) :
     rw [hD, hT']
     rfl
 
-/-- **Query count.** A valid run from the root makes exactly
-`r₀ (1 + r + ⋯ + r^(D-1))` label queries. -/
-theorem queries_root (A : Alg V) (X : Exec ι (Expert ι V k D)) (hist : ℕ → ι → ℝ)
-    (wIn : Expert ι V k D → ℝ) (hX : X.Valid A 0 hist wIn) (hD : 0 < D) :
-    X.queries = A.r₀ * (1 + below A.r (D - 1)) := by
+/-- The query count does not depend on the market condition. -/
+theorem queries_root_with (M : MarketCond ι V k D) (A : Alg V) (X : Exec ι (Expert ι V k D))
+    (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ) (hX : X.ValidWith M A 0 hist wIn)
+    (hD : 0 < D) : X.queries = A.r₀ * (1 + below A.r (D - 1)) := by
   cases X with
   | leaf x wOut =>
     obtain ⟨hl, -, -⟩ := hX
@@ -67,19 +67,38 @@ theorem queries_root (A : Alg V) (X : Exec ι (Expert ι V k D)) (hist : ℕ →
     obtain ⟨-, hT, -, hprobe, -⟩ := hX
     have hT' : T = A.r₀ := by rw [hT, if_pos rfl]
     have hch : ∀ τ : Fin T, (child τ).queries = below A.r (D - 1) :=
-      fun τ => queries_of_valid A (child τ) 1 _ _ (hprobe τ).2.1 Nat.one_pos
+      fun τ => queries_of_validWith M A (child τ) 1 _ _ (hprobe τ).2.1 Nat.one_pos
     simp only [Exec.queries, hch, Finset.sum_const, Finset.card_univ, Fintype.card_fin,
       smul_eq_mul]
     rw [hT']
 
-theorem queries_root_le (A : Alg V) (hr : 2 ≤ A.r) (X : Exec ι (Expert ι V k D))
-    (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ) (hX : X.Valid A 0 hist wIn) (hD : 0 < D) :
+theorem queries_root_le_with (M : MarketCond ι V k D) (A : Alg V) (hr : 2 ≤ A.r)
+    (X : Exec ι (Expert ι V k D)) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ)
+    (hX : X.ValidWith M A 0 hist wIn) (hD : 0 < D) :
     X.queries ≤ 2 * A.r₀ * A.r ^ (D - 1) := by
-  rw [queries_root A X hist wIn hX hD]
+  rw [queries_root_with M A X hist wIn hX hD]
   have := below_le A.r hr (D - 1)
   calc A.r₀ * (1 + below A.r (D - 1)) ≤ A.r₀ * (2 * A.r ^ (D - 1)) :=
         Nat.mul_le_mul_left _ (by omega)
     _ = 2 * A.r₀ * A.r ^ (D - 1) := by ring
+
+theorem queries_of_valid (A : Alg V) (X : Exec ι (Expert ι V k D)) :
+    ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ), X.Valid A l hist wIn → 0 < l →
+      X.queries = below A.r (D - l) :=
+  fun l hist wIn hv =>
+    queries_of_validWith _ A X l hist wIn ((Exec.validWith_exact_iff A X l hist wIn).2 hv)
+
+/-- **Query count.** A valid run from the root makes exactly
+`r₀ (1 + r + ⋯ + r^(D-1))` label queries. -/
+theorem queries_root (A : Alg V) (X : Exec ι (Expert ι V k D)) (hist : ℕ → ι → ℝ)
+    (wIn : Expert ι V k D → ℝ) (hX : X.Valid A 0 hist wIn) (hD : 0 < D) :
+    X.queries = A.r₀ * (1 + below A.r (D - 1)) :=
+  queries_root_with _ A X hist wIn ((Exec.validWith_exact_iff A X 0 hist wIn).2 hX) hD
+
+theorem queries_root_le (A : Alg V) (hr : 2 ≤ A.r) (X : Exec ι (Expert ι V k D))
+    (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ) (hX : X.Valid A 0 hist wIn) (hD : 0 < D) :
+    X.queries ≤ 2 * A.r₀ * A.r ^ (D - 1) :=
+  queries_root_le_with _ A hr X hist wIn ((Exec.validWith_exact_iff A X 0 hist wIn).2 hX) hD
 
 /-! ### The least admissible depth -/
 

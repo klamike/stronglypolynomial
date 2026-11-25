@@ -217,4 +217,67 @@ def Exec.Consistent {E : Type*} (val : V → ℝ) (H : Hyp ι V) : Exec ι E →
   | .node T _ z child _ _ =>
       ∀ τ : Fin T, H.ConsistentAt val (child τ).x (z τ) ∧ (child τ).Consistent val H
 
+/-! ### Runs with a general market condition -/
+
+/-- A market condition: `M l hist w y` says that the proposal `y` is acceptable at a node of
+level `l` with path `hist` when the wealth kept in the market is `w`. -/
+abbrev MarketCond (ι V : Type*) (k D : ℕ) :=
+  ℕ → (ℕ → ι → ℝ) → (Expert ι V k D → ℝ) → (ι → ℝ) → Prop
+
+/-- The exact market: the proposal minimizes the potential for the true wealth. -/
+def exactMarket (val : V → ℝ) : MarketCond ι V k D :=
+  fun l hist w y => ∀ y', Phi val l hist w y ≤ Phi val l hist w y'
+
+/-- The approximately cleared market: the proposal minimizes the potential for some
+nonnegative weights `w'` whose total distance from the true wealth `w` is at most `ζ` times
+the total wealth. -/
+def approxMarket (val : V → ℝ) (ζ : ℝ) : MarketCond ι V k D :=
+  fun l hist w y => ∃ w' : Expert ι V k D → ℝ, (∀ e, 0 ≤ w' e) ∧
+    ∑ e, |w' e - w e| ≤ ζ * ∑ e, w e ∧
+    ∀ y', Phi val l hist w' y ≤ Phi val l hist w' y'
+
+/-- `Exec.Valid` with the market condition replaced by `M`. -/
+def Exec.ValidWith (M : MarketCond ι V k D) (A : Alg V) :
+    Exec ι (Expert ι V k D) → ℕ → (ℕ → ι → ℝ) → (Expert ι V k D → ℝ) → Prop
+  | .leaf x wOut, l, hist, wIn =>
+      l = D ∧ wOut = wIn ∧ ∀ i, IsMedian (fun j : Fin l => hist j i) (x i)
+  | .node T y z child w x, l, hist, wIn =>
+      l < D ∧ T = (if l = 0 then A.r₀ else A.r) ∧ w 0 = wIn ∧
+      (∀ τ : Fin T,
+        M l hist (fun e => (1 - A.c) * w τ e) (y τ) ∧
+        (child τ).ValidWith M A (l + 1) (Function.update hist l (y τ)) (fun e => A.c * w τ e) ∧
+        (∀ e, w (τ + 1) e = A.rnd ((1 - A.c) * w τ e
+            * (1 + A.η * gain A.val l hist (y τ) (feedback (y τ) (child τ).x (z τ)) e)
+            + (child τ).wOut e))) ∧
+      (∀ i, IsMedian (fun τ : Fin T => (child τ).x i) (x i))
+
+/-- A valid run is a run with the exact market condition. -/
+theorem Exec.validWith_exact_iff (A : Alg V) (X : Exec ι (Expert ι V k D)) :
+    ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ),
+      X.ValidWith (exactMarket A.val) A l hist wIn ↔ X.Valid A l hist wIn := by
+  induction X with
+  | leaf x wOut =>
+    intro l hist wIn
+    exact Iff.rfl
+  | node T y z child w x ih =>
+    intro l hist wIn
+    simp only [Exec.ValidWith, Exec.Valid, exactMarket, ih]
+
+omit [Fintype V] in
+/-- Weakening the market condition keeps a run valid. -/
+theorem Exec.ValidWith.mono {M M' : MarketCond ι V k D}
+    (h : ∀ l hist w y, M l hist w y → M' l hist w y) (A : Alg V)
+    (X : Exec ι (Expert ι V k D)) :
+    ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ),
+      X.ValidWith M A l hist wIn → X.ValidWith M' A l hist wIn := by
+  induction X with
+  | leaf x wOut =>
+    intro l hist wIn hv
+    exact hv
+  | node T y z child w x ih =>
+    intro l hist wIn hv
+    obtain ⟨hl, hT, hw0, hprobe, hmed⟩ := hv
+    exact ⟨hl, hT, hw0, fun τ => ⟨h _ _ _ _ (hprobe τ).1, ih τ _ _ _ (hprobe τ).2.1,
+      (hprobe τ).2.2⟩, hmed⟩
+
 end SPLP

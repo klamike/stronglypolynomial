@@ -102,7 +102,21 @@ before it:
   over many cells, which an exact evaluation of the potential needs, can still have a number
   of bits proportional to `t`. Rounding shortens what is stored and updated, not yet the
   arithmetic of an exact market step. That needs markets cleared for approximate weights,
-  which is not proved (see "Open directions").
+  which is the next item.
+- **Markets may be cleared approximately** (`price_search_k4_approx_total`,
+  `price_search_correct_approx`, `Exec.wealth_approx`, in
+  [formal/SPLP/Approx.lean](formal/SPLP/Approx.lean)). A proposal may minimize the potential
+  for any nonnegative weights `w'` with `∑ |w' - w| ≤ ζ · ∑ w`, where `w` is the true wealth
+  (`approxMarket`). Then the aggregate gain at the proposal is at most `ζ` times the total
+  wealth (`approx_gain_le`), total wealth grows by at most a factor `1 + ηζ` per probe, and
+  only the condition at the root changes. For arity 4, with the root making `2 r₀` probes
+  and `ζ ≥ 2^-12 / (2N)^46` (depending only on `N`, not on the range or the pool), every
+  such run meets all demands and makes at most `4 r₀ (2N)^46` label queries; wealth is still
+  rounded to 41 bits. `ζ = 0` is the exact case. So the weights entering a market step can be
+  rounded to a common grid of relative mesh about `ζ / (number of cells)`, which is
+  logarithmically many bits. Not formalized: a procedure producing such weights (the theorem
+  takes any `w'` within the tolerance), and the cell, bit-size and vertex-proposal results
+  are still stated for exactly cleared markets only.
 - **Proposals** (`Consts.exists_vertex_run`, `exists_vertex_min`, `halfInt_of_vertex`,
   `bound_of_vertex`). The potential always has a minimizer that is a vertex (no direction
   preserves all ties between options). With integer demands in `[-R, R]`, every vertex is
@@ -308,10 +322,11 @@ formal/SPLP/PolyCount.lean    counting integer polynomials of bounded degree and
 formal/SPLP/Norm1.lean        the coefficient 1-norm
 formal/SPLP/Minors.lean       minors as integer polynomials in the matrix entries
 formal/SPLP/CountArith.lean   the counting inequality fails at the smaller constant
+formal/SPLP/Approx.lean       approximately cleared markets: correctness and query bound
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 7300 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 8700 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
@@ -416,13 +431,11 @@ stated:
    total for arity 4. A market step whose cost does not grow with the number of completed
    probes (fewer cells, or cells that can be merged or forgotten) would matter more than any
    further constant tuning.
-3. Markets cleared for approximate weights (next concrete step, not yet proved). Claim: the
-   price search stays correct if each proposal minimizes the potential for weights whose
-   total distance from the true ones is at most `ζ` times the total wealth, for instance
-   wealth rounded to a common grid. Total wealth would then grow by at most a factor
-   `1 + ηζ` per probe, and only the condition at the root changes. This would give the market
-   step short integer weights, where exact sums of float wealth are long (caveat under
-   "Wealth can be rounded"), and let an approximate solver stand in for the exact minimizer.
+3. Markets cleared for approximate weights: proved (see "Markets may be cleared
+   approximately"). Open: a formal procedure that produces the approximate weights from the
+   cells, and whether the tolerance must be as small as `1/(2N)^46`. The proof charges the
+   error at every probe of the run; an expert's wealth only passes through the probes on one
+   root-to-leaf path, which suggests (not proved) a tolerance that is polylogarithmic.
 4. Formalize the two missing pieces of the market step in an explicit cost model: the number
    of evaluations needed to reach a vertex minimizer, and counting the experts of a cell.
 5. Tighten the constants feeding `log R` (`H`, `P`, `K`) with proofs.

@@ -120,6 +120,66 @@ theorem Exec.wealth (A : Alg V) (hc0 : 0 < A.c) (hc1 : A.c < 1) (hη0 : 0 < A.η
     intro l hist wIn hv hpos
     exact node_wealth_aux A hc0 hc1 hη0 hη1 hep1 hrnd hv hpos ih T le_rfl
 
+/-! ### Positivity for a general market condition -/
+
+/-- Wealth stays positive at a node whatever the proposals are. -/
+theorem node_pos_aux (M : MarketCond ι V k D) (A : Alg V) (hc0 : 0 < A.c) (hc1 : A.c < 1)
+    (hη0 : 0 < A.η) (hη1 : A.η < 1) {ep : ℝ} (hep1 : ep < 1)
+    (hrnd : ∀ x : ℝ, 0 < x → (1 - ep) * x ≤ A.rnd x ∧ A.rnd x ≤ x) {T : ℕ}
+    {y : Fin T → ι → ℝ} {z : Fin T → ι → Bool}
+    {child : Fin T → Exec ι (Expert ι V k D)} {w : ℕ → Expert ι V k D → ℝ} {x : ι → ℝ}
+    {l : ℕ} {hist : ℕ → ι → ℝ} {wIn : Expert ι V k D → ℝ}
+    (hv : (Exec.node T y z child w x).ValidWith M A l hist wIn) (hpos : ∀ e, 0 < wIn e)
+    (hch : ∀ τ : Fin T, ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ),
+        (child τ).ValidWith M A l hist wIn → (∀ e, 0 < wIn e) → ∀ e, 0 < (child τ).wOut e) :
+    ∀ n, n ≤ T → ∀ e, 0 < w n e := by
+  obtain ⟨-, -, hw0, hprobe, -⟩ := hv
+  intro n
+  induction n with
+  | zero =>
+    intro _
+    rw [hw0]
+    exact hpos
+  | succ n ihn =>
+    intro hn e
+    have hn' : n < T := hn
+    have hposn := ihn (Nat.le_of_lt hn')
+    obtain ⟨-, hchild, hstep⟩ := hprobe ⟨n, hn'⟩
+    have hcout := hch ⟨n, hn'⟩ _ _ _ hchild (fun e => mul_pos hc0 (hposn e))
+    have hg := (gain_bounds A.val l hist e (y ⟨n, hn'⟩)
+      (feedback (y ⟨n, hn'⟩) (child ⟨n, hn'⟩).x (z ⟨n, hn'⟩))).1
+    have h1 : 0 < 1 + A.η * gain A.val l hist (y ⟨n, hn'⟩)
+        (feedback (y ⟨n, hn'⟩) (child ⟨n, hn'⟩).x (z ⟨n, hn'⟩)) e := by
+      nlinarith
+    have hX : 0 < (1 - A.c) * w n e
+        * (1 + A.η * gain A.val l hist (y ⟨n, hn'⟩)
+            (feedback (y ⟨n, hn'⟩) (child ⟨n, hn'⟩).x (z ⟨n, hn'⟩)) e)
+        + (child ⟨n, hn'⟩).wOut e :=
+      add_pos (mul_pos (mul_pos (by linarith) (hposn e)) h1) (hcout e)
+    have hs : w (n + 1) e = A.rnd ((1 - A.c) * w n e
+        * (1 + A.η * gain A.val l hist (y ⟨n, hn'⟩)
+            (feedback (y ⟨n, hn'⟩) (child ⟨n, hn'⟩).x (z ⟨n, hn'⟩)) e)
+        + (child ⟨n, hn'⟩).wOut e) := hstep e
+    rw [hs]
+    exact lt_of_lt_of_le (mul_pos (by linarith) hX) (hrnd _ hX).1
+
+/-- Every node returns positive wealth, whatever the proposals are. -/
+theorem Exec.wealth_pos (M : MarketCond ι V k D) (A : Alg V) (hc0 : 0 < A.c) (hc1 : A.c < 1)
+    (hη0 : 0 < A.η) (hη1 : A.η < 1) {ep : ℝ} (hep1 : ep < 1)
+    (hrnd : ∀ x : ℝ, 0 < x → (1 - ep) * x ≤ A.rnd x ∧ A.rnd x ≤ x)
+    (X : Exec ι (Expert ι V k D)) :
+    ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ), X.ValidWith M A l hist wIn →
+      (∀ e, 0 < wIn e) → ∀ e, 0 < X.wOut e := by
+  induction X with
+  | leaf x wOut =>
+    intro l hist wIn hv hpos
+    obtain ⟨-, hw, -⟩ := hv
+    simp only [Exec.wOut, hw]
+    exact hpos
+  | node T y z child w x ih =>
+    intro l hist wIn hv hpos
+    exact node_pos_aux M A hc0 hc1 hη0 hη1 hep1 hrnd hv hpos ih T le_rfl
+
 /-! ### Bonuses -/
 
 /-- The logarithmic bonus of an expert at a node: `log (1 + κ · returned / input)`. -/
@@ -365,10 +425,13 @@ theorem sum_ge_half {T : ℕ} (a : Fin T → ℝ) (good : Fin T → Prop) [Decid
 
 /-- **Charging.** For a hypothesis consistent with the run and any node invariant, a node
 either succeeds (its prices bring every surplus down to its threshold), or it is internal and
-its weighted bonus is at least `σ` per probe (Lemma 5.4 of the preprint). -/
-theorem node_claim (P : Params ι V k D) (H : Hyp ι V) (X : Exec ι (Expert ι V k D)) :
+its weighted bonus is at least `σ` per probe (Lemma 5.4 of the preprint). The proposals may be
+arbitrary: the market condition `M` is not used here, it only enters through the bound on the
+total wealth at the root. -/
+theorem node_claim_with (M : MarketCond ι V k D) (P : Params ι V k D) (H : Hyp ι V)
+    (X : Exec ι (Expert ι V k D)) :
     ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ),
-      X.Valid P.A l hist wIn → (∀ e, 0 < wIn e) → X.Consistent P.A.val H →
+      X.ValidWith M P.A l hist wIn → (∀ e, 0 < wIn e) → X.Consistent P.A.val H →
       ∀ (m : Slot ι → ℝ) (t : ℝ) (d₀ : Option (Fin D × Slot ι)),
         NodeInv P.A.val H P.ρ P.β l hist m t d₀ →
         (∀ s ∈ H.S, H.surplus P.A.val X.x s ≤ t) ∨
@@ -385,15 +448,15 @@ theorem node_claim (P : Params ι V k D) (H : Hyp ι V) (X : Exec ι (Expert ι 
     have hv' := hv
     obtain ⟨hl, hT, hw0, hprobe, hmed⟩ := hv
     -- wealth is positive throughout the node
-    have hwealth := node_wealth_aux P.A P.hc0 P.hc1 P.hη0 P.hη1 P.hep1 P.hrnd hv' hpos
-      (fun τ => Exec.wealth P.A P.hc0 P.hc1 P.hη0 P.hη1 P.hep1 P.hrnd (child τ))
+    have hwealth := node_pos_aux M P.A P.hc0 P.hc1 P.hη0 P.hη1 P.hep1 P.hrnd hv' hpos
+      (fun τ => Exec.wealth_pos M P.A P.hc0 P.hc1 P.hη0 P.hη1 P.hep1 P.hrnd (child τ))
     have hwpos : ∀ (τ : Fin T) (e : Expert ι V k D), 0 < w τ e :=
-      fun τ e => (hwealth τ (Nat.le_of_lt τ.2)).1 e
+      fun τ e => hwealth τ (Nat.le_of_lt τ.2) e
     have hwcpos : ∀ (τ : Fin T) (e : Expert ι V k D), 0 < P.A.c * w τ e :=
       fun τ e => mul_pos P.hc0 (hwpos τ e)
     have hcout : ∀ (τ : Fin T) (e : Expert ι V k D), 0 < (child τ).wOut e :=
-      fun τ => (Exec.wealth P.A P.hc0 P.hc1 P.hη0 P.hη1 P.hep1 P.hrnd (child τ) _ _ _
-        (hprobe τ).2.1 (hwcpos τ)).1
+      fun τ => Exec.wealth_pos M P.A P.hc0 P.hc1 P.hη0 P.hη1 P.hep1 P.hrnd (child τ) _ _ _
+        (hprobe τ).2.1 (hwcpos τ)
     -- every probe contributes
     have hstepA : ∀ τ : Fin T,
         ((∀ s ∈ H.S, H.surplus P.A.val (child τ).x s ≤ t) ∧
@@ -482,6 +545,19 @@ theorem node_claim (P : Params ι V k D) (H : Hyp ι V) (X : Exec ι (Expert ι 
         nlinarith
       show P.σ * (T : ℝ) ≤ Psi H P.ω l m d₀ (bonus P.κ wIn (w T))
       linarith
+
+/-- The charging lemma for valid runs (exact market). -/
+theorem node_claim (P : Params ι V k D) (H : Hyp ι V) (X : Exec ι (Expert ι V k D)) :
+    ∀ (l : ℕ) (hist : ℕ → ι → ℝ) (wIn : Expert ι V k D → ℝ),
+      X.Valid P.A l hist wIn → (∀ e, 0 < wIn e) → X.Consistent P.A.val H →
+      ∀ (m : Slot ι → ℝ) (t : ℝ) (d₀ : Option (Fin D × Slot ι)),
+        NodeInv P.A.val H P.ρ P.β l hist m t d₀ →
+        (∀ s ∈ H.S, H.surplus P.A.val X.x s ≤ t) ∨
+        (l < D ∧ P.σ * ((if l = 0 then P.A.r₀ else P.A.r : ℕ) : ℝ)
+            ≤ Psi H P.ω l m d₀ (bonus P.κ wIn X.wOut)) :=
+  fun l hist wIn hv =>
+    node_claim_with (exactMarket P.A.val) P H X l hist wIn
+      ((Exec.validWith_exact_iff P.A X l hist wIn).2 hv)
 
 /-! ### The theorem -/
 
