@@ -18,3 +18,4 @@
 # Trimmed local build of the upstream Lean development (see README)
 /upstream-build/
 /upstream-build-log/
+/upstream-build-clock/
