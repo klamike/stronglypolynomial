@@ -286,6 +286,20 @@ algorithm:
   Lemmas 5.2 to 5.4.
 - The value of `K` and the count of queries per side decision.
 
+How the upstream Lean development handles this constant (from reading its sources; it was
+not built here, so nothing in this paragraph is checked by a compiler). Its `paperWidth N =
+(N+1)^6` occurs 88 times in 31 files of `Compression/`. The mathematical core is generic in a
+`width` with hypotheses of the form `I.card ≤ width` (`epoch_realization`,
+`epoch_commit_extends_accepted`, `exists_offline_assignment_of_dissociated_bound`); no step
+was found that needs the width to be large. Its final bound is cruder than the text's:
+`log₂ F` is about `8 w⁷ (10 w + 12 B)` with `w` the width and `B = 100 (N+1)³`, so about
+`80 (N+1)^48` as it stands. With `w` of order `N² log N` that would be of order
+`N^17 log⁷ N`. Replacing the width in the mathematics looks like a local change (definitions
+and about 25 short arithmetic repairs). Lowering the stated bound all the way is not local
+there, because the bit budget is evaluated on the machine model as a polynomial in `N` and a
+logarithm is not one; a polynomial width of order `N³`, which `log_bound_lt_cutoff` already
+supports, keeps everything polynomial and would give order `N^24`.
+
 ### 7. The precision constants `H`, `P`, `K` can be much smaller (new)
 
 `log R` is of order `D⁴ K` (result 6), and `K ≈ (N+1) P` where `P ≈ 10⁴ N²` is the precision
