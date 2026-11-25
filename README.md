@@ -131,6 +131,24 @@ before it:
   `2^-25 / (number of cells)`. Not formalized: a procedure producing such weights (the theorem
   takes any `w'` within the tolerance), and the cell, bit-size and vertex-proposal results
   are still stated for exactly cleared markets only.
+- **Only the aggregate gain matters** (`price_search_k4_gain_const`, `approxMarket_gain`,
+  `gainMarket_of_selection`, in [formal/SPLP/GainMarket.lean](formal/SPLP/GainMarket.lean)).
+  The proof uses a proposal `y` only through one property: for every feedback `v`, the
+  aggregate gain `∑ w_e · gain(y, v, e)` is at most `ζ` times the total wealth
+  (`gainMarket`). Any run whose proposals have this property with `ζ = 2^-25` meets all
+  demands within the same query bound; no potential has to be minimized, exactly or
+  approximately, and approximately cleared markets are a special case. The property is
+  certified by `N` numbers: if each expert's weight is split among its best options at `y`
+  and the resulting signed slot masses satisfy `∑_i |m_i| ≤ ζ · (total wealth)`, the proposal
+  is admissible. Without ties `m_i` is the wealth betting on slot `(i, +)` minus the wealth
+  betting on `(i, -)`.
+- **The maximum cannot be factored** (`argmax_factor_const`, in
+  [formal/SPLP/ArgmaxFactor.lean](formal/SPLP/ArgmaxFactor.lean)). The factor applied to an
+  expert at a probe depends on which of its options is best. A nonvanishing function of the
+  index of the maximum of three values that is a product of functions of the three pairwise
+  comparisons is constant. So the wealth measure is not a pairwise product model, and
+  dynamic programming along the comparisons (which would cost `t²` instead of `t^k`) is not
+  available; computing the maximum by a chain or a tournament does not change this.
 - **Proposals** (`Consts.exists_vertex_run`, `exists_vertex_min`, `halfInt_of_vertex`,
   `bound_of_vertex`). The potential always has a minimizer that is a vertex (no direction
   preserves all ties between options). With integer demands in `[-R, R]`, every vertex is
@@ -433,6 +451,8 @@ formal/SPLP/CountArith.lean   the counting inequality fails at the smaller const
 formal/SPLP/RangeBound.lean   size of the preprint's demand bound as a function of its constant
 formal/SPLP/Approx.lean       approximately cleared markets: correctness and query bound
 formal/SPLP/ApproxLevel.lean  the same with a constant tolerance (errors weighted by invested share)
+formal/SPLP/GainMarket.lean   the market condition reduced to the aggregate gain; N-number certificate
+formal/SPLP/ArgmaxFactor.lean the factor of the best option is not a product of pairwise comparisons
 formal/SPLP/PairTest.lean     Lemma 3.1 of the preprint with explicit constants
 formal/SPLP/DiffConstraints.lean  difference constraints: negative-cycle criterion, sign transfer
 formal/SPLP/BlockMinors.lean  cofactor vectors of a block-diagonal basis are one-sided
@@ -440,7 +460,7 @@ formal/SPLP/Precision.lean    coefficient bound 3^j; the label test with explici
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 10300 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 10700 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
@@ -553,6 +573,20 @@ stated:
    negative: a sparse weighted sample of experts does not work as the approximate weights,
    since its error on ranges grows by a factor `1 + η(k+1)` per update; only closeness in
    total variation is stable under the multiplicative updates.
+   Further findings on a cheaper market step (not formalized unless a theorem is named):
+   - An approximate minimizer of the potential in value does not give the gain condition
+     (for `Φ(y) = W|y|` the point `y = ε/W` has value `ε` and slope `-W`), so with a
+     first-order oracle exact minimization remains; the number of evaluations is polynomial
+     and is not the bottleneck.
+   - Letting an expert bet on every slot above its threshold, or replacing it by `k`
+     single-slot experts, breaks the analysis: feedback is guaranteed only above the child's
+     threshold, and for `k = 1` the average log gain is negative.
+   - Multiplying per-slot factors would make the wealth a product measure but adds about
+     `1.5 · 10^-3` per probe to wealth growth, against about `3 · 10^-9` tolerated.
+   - Open lead: the wealth evolution is a sequence of range updates on the cells of a tropical
+     arrangement, and the sets summed are simplicial cones; partition trees with lazy updates
+     might cost `t^(k-1+o(1))` per update or evaluation in place of `t^k` (for arity 4,
+     roughly exponent 234 to 188). The dynamic details are unverified.
 4. Formalize the two missing pieces of the market step in an explicit cost model: the number
    of evaluations needed to reach a vertex minimizer, and counting the experts of a cell.
 5. Tighten the constants feeding `log R` (`H`, `P`, `K`) with proofs.

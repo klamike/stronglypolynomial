@@ -36,6 +36,8 @@ import SPLP.Dissociated
 import SPLP.RangeBound
 import SPLP.Approx
 import SPLP.ApproxLevel
+import SPLP.GainMarket
+import SPLP.ArgmaxFactor
 import SPLP.PairTest
 import SPLP.DiffConstraints
 import SPLP.BlockMinors
