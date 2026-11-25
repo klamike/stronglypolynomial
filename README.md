@@ -301,19 +301,27 @@ which every form of norm at most `n · A` that is nonnegative at `g` is nonnegat
 (`diff_feasible_of_type`). The preprint's Lemma 4.1, for a general system, needs agreement up
 to norm `(n+1) A^(n+1)`.
 
-Not formalized (a reading of the preprint's Section 4, by an agent, checked by me only in
-outline):
+[formal/SPLP/BlockMinors.lean](formal/SPLP/BlockMinors.lean) proves that this is the
+situation of the LP reduction. The preprint's inequalities (its Section 4.3) compare two
+slots `s = (i, h)`, `t = (i', h')` on the support of one cofactor vector
+`c_s = det B0[rows, (T, s)]`, through `h p_i - h' p_i'` with weak inequalities; they are
+difference constraints when `h = h'`. For a basis of `C × C⊥` that vanishes off its two
+diagonal blocks, a square minor is zero unless it uses as many positive columns as rows of
+`C` (`det_eq_zero_of_block_card`), so a cofactor vector cannot be nonzero at a positive and
+at a negative slot (`block_minors_one_sided`): `h = h'` always.
 
+Not formalized (the first item is my reading of Section 4.3; the others are a reading of
+Section 4 by an agent, checked by me only in outline):
+
+- That the system of Section 4.3 is exactly the set of two-slot comparisons described above,
+  for a block-diagonal basis. Given that, `2^K ≥ N · A` replaces `2^K ≥ (N+1) A^(N+1)` and
+  `K ≈ P + log₂ P + log₂ N`, a factor `N` less in `K` and in `log R`.
 - The proof of Theorem 3 derives coefficient bounds `3^(j-1)` at row `j`, so `H ≥ 3^(r-1)`
   with `r ≤ 2N` rows would do in place of `2^(100 N²)`, and then `P ≈ log₂ H + 2 log₂ N + 11`,
   linear in `N`.
-- `K` is defined through `2^K ≥ (N+1) A^(N+1)` because the `N` prices are eliminated from a
-  general linear system. The inequalities being eliminated compare two slots of one cofactor
-  vector and contain two prices with unit coefficients. If they are difference constraints
-  (which holds when both slots lie on the same side), `diff_feasible_of_type` applies and
-  `2^K ≥ N · A` suffices, giving `K ≈ P + log₂ P + log₂ N`. Whether the preprint's system
-  has this form is the unverified step; its strict inequalities and the mixed-side case
-  (two-variable constraints with signs) are also not covered by the theorem.
+- The preprint's Sections 7 to 9 use other spaces `W`, where slots of both sides can occur
+  in one cofactor vector (two-variable constraints with signs); the theorems here do not
+  cover that case.
 - Together: `K` from about `10⁴ N³` to about `2N` to `4N`, and `log R` to order
   `N⁹ log⁴ N`. Later sections of the preprint reuse these constants and were not checked.
 
@@ -391,10 +399,11 @@ formal/SPLP/Approx.lean       approximately cleared markets: correctness and que
 formal/SPLP/ApproxLevel.lean  the same with a constant tolerance (errors weighted by invested share)
 formal/SPLP/PairTest.lean     Lemma 3.1 of the preprint with explicit constants
 formal/SPLP/DiffConstraints.lean  difference constraints: negative-cycle criterion, sign transfer
+formal/SPLP/BlockMinors.lean  cofactor vectors of a block-diagonal basis are one-sided
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 9900 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 10000 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
