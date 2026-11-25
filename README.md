@@ -131,6 +131,21 @@ before it:
   `2^-25 / (number of cells)`. Not formalized: a procedure producing such weights (the theorem
   takes any `w'` within the tolerance), and the cell, bit-size and vertex-proposal results
   are still stated for exactly cleared markets only.
+- **The other arities** ([formal/SPLP/ArityConst.lean](formal/SPLP/ArityConst.lean)). The
+  constant tolerance needs `c · r < 1`, which holds for all four instances. With the root
+  making `2 r₀` probes and at most `4 r₀ (2N)^e` label queries, for approximately cleared
+  markets and for the aggregate-gain condition of the next item
+  (`price_search_k{3,5,6}_approx_const`, `price_search_k{3,5,6}_gain_const`):
+
+  | Arity | `c · r` | Tolerance | `e` |
+  | --- | --- | --- | --- |
+  | 3 | 0.924 | `2^-22` | 66 |
+  | 4 | 0.960 | `2^-25` | 46 |
+  | 5 | 0.815 | `2^-21` | 39 |
+  | 6 | 0.322 | `2^-18` | 35 |
+
+  Within this argument the tolerances for arities 3, 5 and 6 cannot be doubled
+  (`K3_tolerance_sharp`, `K5_tolerance_sharp`, `K6_tolerance_sharp`).
 - **Only the aggregate gain matters** (`price_search_k4_gain_const`, `approxMarket_gain`,
   `gainMarket_of_selection`, in [formal/SPLP/GainMarket.lean](formal/SPLP/GainMarket.lean)).
   The proof uses a proposal `y` only through one property: for every feedback `v`, the
@@ -589,6 +604,7 @@ formal/SPLP/RangeBound.lean   size of the preprint's demand bound as a function 
 formal/SPLP/Approx.lean       approximately cleared markets: correctness and query bound
 formal/SPLP/ApproxLevel.lean  the same with a constant tolerance (errors weighted by invested share)
 formal/SPLP/GainMarket.lean   the market condition reduced to the aggregate gain; N-number certificate
+formal/SPLP/ArityConst.lean   constant tolerance and gain condition for arities 3, 5, 6
 formal/SPLP/ArgmaxFactor.lean the factor of the best option is not a product of pairwise comparisons
 formal/SPLP/PairTest.lean     Lemma 3.1 of the preprint with explicit constants
 formal/SPLP/DiffConstraints.lean  difference constraints: negative-cycle criterion, sign transfer
@@ -600,7 +616,7 @@ formal/SPLP/Compat.lean       lemmas stated locally so the library builds under 
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 11800 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 12100 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
@@ -711,7 +727,7 @@ stated:
 3. Markets cleared for approximate weights: proved, with a constant tolerance for arity 4
    (see "Markets may be cleared approximately"). Open: a formal procedure that produces the
    approximate weights from the cells; the cell, bit-size and vertex-proposal results for
-   approximately cleared markets; `c · r < 1` for arities 3, 5, 6. Not formalized, and
+   approximately cleared markets. Not formalized, and
    negative: a sparse weighted sample of experts does not work as the approximate weights,
    since its error on ranges grows by a factor `1 + η(k+1)` per update; only closeness in
    total variation is stable under the multiplicative updates.
