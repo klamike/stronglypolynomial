@@ -315,7 +315,20 @@ from about `2^202` bits to about `2^129`). The change is three files and 52 line
 [upstream-patches/build-core.sh](upstream-patches/build-core.sh) (Lean 4.34.1 and upstream's
 Mathlib revision; the unchanged core is built first as a control). The core is the 54
 modules that `MinorAssignments`, `AdaptiveRequests`, `BitBudget` and `Offline` import, and
-needs only Mathlib. Not yet covered: the layers above the core (the machine-model
+needs only Mathlib.
+
+The same core also builds with a width of order `N² log N`
+([upstream-patches/core-logwidth.patch](upstream-patches/core-logwidth.patch), additive: it
+keeps every existing declaration and adds width-generic versions). With
+`logWidth N = (7N²+8) · Nat.size N + 1`, the theorem `minor_transcript_guarantees_logWidth`
+gives the same conclusion with the bit bound `2^(onlineMinorBitFormulaW (logWidth N) N)`,
+standard axioms only. Evaluated, the base-two logarithm of that exponent grows by about
+17.5 per doubling of `N` against 24 for the polynomial width and 48 for upstream's
+(`N = 1024`: `2^227`, `2^272`, `2^486` bits). This bound is not a polynomial in `N`, which
+upstream's machine-model layer requires, so it is a statement about the mathematics of the
+section only.
+
+Not yet covered: the layers above the core (the machine-model
 implementation and its cost accounting, 769 modules in all), which use the old closed form
 in about 25 places.
 

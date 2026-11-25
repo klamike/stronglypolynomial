@@ -22,5 +22,8 @@ lake exe cache get
 C=OAI.Optimization.LinearProgramming.Compression
 TARGETS="$C.MinorAssignments $C.AdaptiveRequests $C.BitBudget $C.Offline"
 lake build $TARGETS          # upstream, unchanged
-patch -p1 < "$HERE/core-width.patch"
+# core-width.patch is the minimal change (three definitions and one proof);
+# core-logwidth.patch contains it and adds the width-generic theorems and the width
+# (7N^2+8) * Nat.size N + 1. Either applies to the pristine files.
+patch -p1 < "$HERE/${PATCH:-core-logwidth.patch}"
 lake build $TARGETS          # with the smaller width

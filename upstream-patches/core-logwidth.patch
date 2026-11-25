@@ -1,0 +1,268 @@
+--- a/OAI/Optimization/LinearProgramming/Compression/AdaptiveRequests.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/AdaptiveRequests.lean
+@@ -17,7 +17,7 @@
+ 
+ def paperRadius (N : ℕ) : ℕ := 100*(N+1)^3
+ def paperGrid (N : ℕ) : ℕ := 2^(paperRadius N+7)
+-def paperWidth (N : ℕ) : ℕ := (N+1)^6
++def paperWidth (N : ℕ) : ℕ := (7*N^2+8)*N+1
+ 
+ def epochCandidateHeight (N k : ℕ) : ℕ := requestCutoff (k+1)*paperGrid N
+ 
+@@ -124,6 +124,106 @@
+     ValidEpochCommit (fun j : J => proxy j) (paperWidth N) (epochHeightFor N J.card)
+       (canonicalMinorCommit N proxy J) := epochCommit_valid ..
+ 
++/-! ### Width-generic versions
++
++The same statements with an arbitrary bound `w` on the size of dissociated sets in place of
++`paperWidth N`; the bit bound becomes `2^(onlineMinorBitFormulaW w N)`. -/
++
++/-- `ValidMinorAssignment` with the bit bound of an arbitrary width `w`. -/
++def ValidMinorAssignmentW (w N : ℕ) (trueLog : ι → ℝ) (f : ι → ℚ) : Prop :=
++  (∀ u, |f u| ≤ ((2:ℕ)^(onlineMinorBitFormulaW w N) : ℕ) ∧
++    (f u).num.natAbs ≤ 2^(onlineMinorBitFormulaW w N) ∧
++    (f u).den ≤ 2^(onlineMinorBitFormulaW w N)) ∧
++  ∀ a : ι → ℤ, (∑ u, |(a u : ℝ)|) ≤ 4 →
++    |clip (paperRadius N) (intForm a (fun u => (f u : ℝ))) -
++      clip (paperRadius N) (intForm a trueLog)| ≤ 1/(2:ℝ)^(paperRadius N)
++
++omit [LinearOrder ι] in
++/-- At the width `paperWidth N` the generic predicate is the original one. -/
++theorem validMinorAssignmentW_paperWidth (N : ℕ) (trueLog : ι → ℝ) (f : ι → ℚ) :
++    ValidMinorAssignmentW (paperWidth N) N trueLog f ↔ ValidMinorAssignment N trueLog f := by
++  unfold ValidMinorAssignmentW ValidMinorAssignment paperWidth
++  rw [onlineMinorBitPolynomial_eval_eq_W]
++
++omit [LinearOrder ι] in
++/-- A valid assignment for a smaller width is valid for a larger one. -/
++theorem ValidMinorAssignmentW.mono {w w' N : ℕ} (hw : w ≤ w') {trueLog : ι → ℝ} {f : ι → ℚ}
++    (h : ValidMinorAssignmentW w N trueLog f) : ValidMinorAssignmentW w' N trueLog f := by
++  have hp : (2:ℕ)^(onlineMinorBitFormulaW w N) ≤ 2^(onlineMinorBitFormulaW w' N) :=
++    Nat.pow_le_pow_right (by decide) (onlineMinorBitFormulaW_mono N hw)
++  refine ⟨fun u => ⟨(h.1 u).1.trans (by exact_mod_cast hp), (h.1 u).2.1.trans hp,
++    (h.1 u).2.2.trans hp⟩, h.2⟩
++
++/-- Width-generic form of `all_successful_requests_extend`. -/
++theorem all_successful_requests_extend_W (w N : ℕ) (proxy trueLog : ι → ℝ)
++    (hproxy : ∀ i, |proxy i - trueLog i| ≤ 1/(paperGrid N : ℝ))
++    (hwidth : ∀ J : Finset ι, IsDissociated proxy J → J.card ≤ w)
++    (raw : ∀ J : Finset ι, ι → Option ((Fin J.card → ℚ) × ℚ))
++    (hrows : GoodRequestRows N proxy raw)
++    (commit : ∀ J : Finset ι, J → ℚ)
++    (hcommit : ∀ J : Finset ι, IsDissociated proxy J →
++      ValidEpochCommit (fun j : J => proxy j) w
++        (epochHeightFor N J.card) (commit J))
++    (J : Finset ι) (hJ : IsDissociated proxy J) :
++    ∃ f : ι → ℚ, ValidMinorAssignmentW w N trueLog f ∧
++      ∀ u q, evaluateMinorRequest commit raw J u = some q → f u = q := by
++  classical
++  let U := (Finset.univ : Finset ι)
++  let F := knownRequestFamily U J (raw J)
++  let S := acceptedRequests U J (raw J)
++  have hE : 0 < paperGrid N := by dsimp [paperGrid]; positivity
++  have hgood := hrows.spec J hJ
++  obtain ⟨f, hagree, hsize, hclip⟩ := epoch_commit_extends_accepted proxy U J
++    (fun u => trueLog u) (Finset.subset_univ _) hJ w (paperRadius N)
++    (paperGrid N) (epochCandidateHeight N J.card) hE (fun I _ => hwidth I)
++    (fun u => hproxy u) S F (fun u hu => (hgood u hu).1)
++    (fun u hu => (hgood u hu).2.1) (fun u hu => (hgood u hu).2.2) (commit J) (hcommit J hJ)
++  refine ⟨fun i => f (liftUniv i), ⟨?_, ?_⟩, ?_⟩
++  · intro i
++    have hcap := fiber_value_height_W w N J.card w (hwidth J hJ) le_rfl
++    have hn := (hsize (liftUniv i)).1.trans hcap
++    have hd := (hsize (liftUniv i)).2.trans hcap
++    exact ⟨(rat_abs_le_num_natAbs _).trans (by exact_mod_cast hn), hn, hd⟩
++  · intro a ha
++    have hm : (∑ u : U, |(a u.val : ℝ)|) ≤ 4 := by
++      rw [reindex_sum]
++      exact ha
++    have h := hclip (fun u => a u.val) hm
++    unfold intForm at h ⊢
++    rw [reindex_sum, reindex_sum] at h
++    apply h.trans
++    simpa only [paperGrid, Nat.cast_pow, Nat.cast_ofNat] using seventeen_units_le_clip_precision (paperRadius N)
++  · intro i q hh
++    have ha := mem_accepted_of_evaluate_some U J raw commit (liftUniv i) hh
++    have h := knownRequestFamily_evaluate U J raw commit (liftUniv i) ha
++    exact (hagree _ ha).trans (Option.some.inj (h.symm.trans hh))
++
++/-- Width-generic form of `all_prefixes_extend`. -/
++theorem all_prefixes_extend_W (w N : ℕ) (proxy trueLog : ι → ℝ)
++    (hproxy : ∀ i, |proxy i - trueLog i| ≤ 1/(paperGrid N : ℝ))
++    (hwidth : ∀ J : Finset ι, IsDissociated proxy J → J.card ≤ w)
++    (raw : ∀ J : Finset ι, ι → Option ((Fin J.card → ℚ) × ℚ))
++    (hrows : GoodRequestRows N proxy raw)
++    (commit : ∀ J : Finset ι, J → ℚ)
++    (hcommit : ∀ J : Finset ι, IsDissociated proxy J →
++      ValidEpochCommit (fun j : J => proxy j) w
++        (epochHeightFor N J.card) (commit J))
++    (hrestart : RestartTest proxy (evaluateMinorRequest commit raw)) (indices : List ι) :
++    ∃ f : ι → ℚ, ValidMinorAssignmentW w N trueLog f ∧
++      ∀ u q, (u,q) ∈ (RequestTrace.replay (evaluateMinorRequest commit raw) indices).replies →
++        f u = q := by
++  apply RequestTrace.common_assignment proxy _ hrestart
++  exact all_successful_requests_extend_W w N proxy trueLog hproxy hwidth raw hrows commit hcommit
++
++/-- The canonical commitment for an arbitrary width. -/
++noncomputable def canonicalMinorCommitW (w N : ℕ) (proxy : ι → ℝ) (J : Finset ι) : J → ℚ :=
++  epochCommit (fun j : J => proxy j) w (epochHeightFor N J.card)
++
++omit [LinearOrder ι] [Fintype ι] in
++theorem canonicalMinorCommitW_valid (w N : ℕ) (proxy : ι → ℝ) (J : Finset ι) :
++    ValidEpochCommit (fun j : J => proxy j) w (epochHeightFor N J.card)
++      (canonicalMinorCommitW w N proxy J) := epochCommit_valid ..
++
+ end Compression
+ end LinearProgramming
+ end Optimization
+--- a/OAI/Optimization/LinearProgramming/Compression/BitBudget.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/BitBudget.lean
+@@ -181,7 +181,7 @@
+ /-- The composition of the preceding bounds, interpreted over any commutative
+ semiring so that it can be used both as an actual polynomial and as a natural budget. -/
+ def onlineMinorBitFormula {R : Type*} [CommSemiring R] (N : R) : R :=
+-  let w := (N+1)^6
++  let w := (7*N^2+8)*N+1
+   let B := 100*(N+1)^3
+   let a := (2*w+B+14)+B+8
+   let L := ((B+17)+(2+a)+1)+((B+7)+a*4)
+@@ -207,8 +207,8 @@
+ 
+ /-- The numerical output bound for the manuscript constants, written as a power of
+ two with the same polynomial exponent in every dimension and every epoch. -/
+-theorem fiber_manuscript_value_height (N k dim : ℕ) (hk : k ≤ (N+1)^6) (hd : dim ≤ (N+1)^6) :
+-    let width := (N+1)^6
++theorem fiber_manuscript_value_height (N k dim : ℕ) (hk : k ≤ (7*N^2+8)*N+1) (hd : dim ≤ (7*N^2+8)*N+1) :
++    let width := (7*N^2+8)*N+1
+     let B := 100*(N+1)^3
+     let E := (2:ℕ)^(B+7)
+     let C := max (requestCutoff (k+1)*E) (2*E)
+@@ -218,6 +218,47 @@
+   rw [onlineMinorBitPolynomial_eval]
+   exact fiber_uniform_value_height_le_two_pow _ _ _ _ _ _ hk hd (fiber_request_height_le_two_pow hk)
+ 
++/-- The bit formula `onlineMinorBitFormula` with the width bound on generator sets as a
++parameter instead of the fixed polynomial `(7*N^2+8)*N+1`. -/
++def onlineMinorBitFormulaW (w N : ℕ) : ℕ :=
++  let B := 100*(N+1)^3
++  let a := (2*w+B+14)+B+8
++  let L := ((B+17)+(2+a)+1)+((B+7)+a*4)
++  let n := w+1
++  let u := L*(w+w+2)
++  let cuts := w+1+(n+((n*n+(n+u*2)*n)*2+u))
++  let m := w+1+cuts+1
++  let commitment := fiberCommitCapFormula w m
++  let pinned := L+commitment+2
++  let point := w*w+pinned*(w+2)*w
++  w+1+((a+1)+(point+1))*(w+2)
++
++theorem onlineMinorBitFormula_eq_W (N : ℕ) :
++    onlineMinorBitFormula N = onlineMinorBitFormulaW ((7*N^2+8)*N+1) N := rfl
++
++theorem onlineMinorBitPolynomial_eval_eq_W (N : ℕ) :
++    onlineMinorBitPolynomial.eval N = onlineMinorBitFormulaW ((7*N^2+8)*N+1) N :=
++  onlineMinorBitPolynomial_eval N
++
++/-- The width-parametric exponent is monotone in the width. -/
++theorem onlineMinorBitFormulaW_mono {w w' : ℕ} (N : ℕ) (hw : w ≤ w') :
++    onlineMinorBitFormulaW w N ≤ onlineMinorBitFormulaW w' N := by
++  unfold onlineMinorBitFormulaW fiberCommitCapFormula
++  dsimp only
++  gcongr
++
++/-- Width-generic form of `fiber_manuscript_value_height`: any bound `width` on the number
++of committed coordinates and on the completion dimension gives the output bound
++`2^(onlineMinorBitFormulaW width N)`. -/
++theorem fiber_value_height_W (width N k dim : ℕ) (hk : k ≤ width) (hd : dim ≤ width) :
++    let B := 100*(N+1)^3
++    let E := (2:ℕ)^(B+7)
++    let C := max (requestCutoff (k+1)*E) (2*E)
++    let H := (B+17+4*C)*(E*C^4)
++    offlineValueCap dim C (offlinePointCap dim (fiberPinnedHeight k width H)) ≤
++      2^(onlineMinorBitFormulaW width N) :=
++  fiber_uniform_value_height_le_two_pow _ _ _ _ _ _ hk hd (fiber_request_height_le_two_pow hk)
++
+ end Compression
+ end LinearProgramming
+ end Optimization
+--- a/OAI/Optimization/LinearProgramming/Compression/MinorAssignments.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/MinorAssignments.lean
+@@ -68,9 +68,14 @@
+   have h := dissociated_nonzeroPairMinor_card_le D E hN hr (Rat.castHom ℝ)
+     Rat.cast_injective J (minorProxy D E fuel) (fun i _ => hclose i) hJ
+   refine ⟨h, ?_⟩
+-  have hc := h.trans_lt (log_bound_lt_cutoff N)
++  have hr2 : (N:ℝ) + 1 ≤ (2:ℝ)^N := by exact_mod_cast N.lt_two_pow_self
++  have hl := Real.logb_le_logb_of_le (by norm_num : (1:ℝ) < 2) (by positivity) hr2
++  rw [Real.logb_pow, Real.logb_self_eq_one (by norm_num : (1:ℝ) < 2), mul_one] at hl
++  have hc : (J.card : ℝ) ≤ (7*(N:ℝ)^2+8)*N :=
++    h.trans (mul_le_mul_of_nonneg_left hl (by positivity))
+   unfold paperWidth
+-  exact_mod_cast hc.le
++  have hcast : (J.card : ℝ) ≤ (((7*N^2+8)*N+1 : ℕ) : ℝ) := by push_cast; linarith
++  exact_mod_cast hcast
+ 
+ /-- Every square minor of a matrix with no columns is the empty minor. -/
+ theorem minorMagnitude_zero_columns (D₀ : Matrix (Fin rD) (Fin 0) ℚ)
+@@ -144,6 +149,60 @@
+         ∀ u q, (u,q) ∈ st.replies → f u = q := by
+   exact minor_transcript_guarantees_all D E fuel hr raw hraw commit hcommit hrestart indices
+ 
++/-! ### Logarithmic width
++
++The sharper first conjunct of `minorProxy_independent_bound_all` bounds dissociated sets by
++`(7N²+8)·log₂(N+1)`; with `Nat.size N` (the binary length of `N`) as an integer upper bound for
++the logarithm this gives a width of order `N² log N` instead of `N³`. -/
++
++/-- Integer width bound `(7N²+8)·⌈log₂(N+1)⌉ + 1`, where `Nat.size N = ⌈log₂(N+1)⌉`. -/
++def logWidth (N : ℕ) : ℕ := (7*N^2+8) * Nat.size N + 1
++
++/-- The logarithmic width never exceeds the polynomial width. -/
++theorem logWidth_le_paperWidth (N : ℕ) : logWidth N ≤ paperWidth N := by
++  have hs : Nat.size N ≤ N := Nat.size_le.mpr N.lt_two_pow_self
++  unfold logWidth paperWidth
++  gcongr
++
++theorem logb_succ_le_size (N : ℕ) : Real.logb 2 ((N:ℝ)+1) ≤ (Nat.size N : ℝ) := by
++  have hr2 : (N:ℝ) + 1 ≤ (2:ℝ)^(Nat.size N) := by exact_mod_cast Nat.lt_size_self N
++  have hl := Real.logb_le_logb_of_le (by norm_num : (1:ℝ) < 2) (by positivity) hr2
++  rwa [Real.logb_pow, Real.logb_self_eq_one (by norm_num : (1:ℝ) < 2), mul_one] at hl
++
++/-- Dissociated sets of minor proxies have at most `logWidth N` elements. -/
++theorem minorProxy_independent_card_le_logWidth (fuel : ℕ) (hr : rD+rE=N)
++    (J : Finset (NonzeroPairMinor D E)) (hJ : IsDissociated (minorProxy D E fuel) J) :
++    J.card ≤ logWidth N := by
++  have h := (minorProxy_independent_bound_all D E fuel hr J hJ).1
++  have hc : (J.card : ℝ) ≤ (7*(N:ℝ)^2+8)*(Nat.size N : ℝ) :=
++    h.trans (mul_le_mul_of_nonneg_left (logb_succ_le_size N) (by positivity))
++  unfold logWidth
++  have hcast : (J.card : ℝ) ≤ (((7*N^2+8)*Nat.size N+1 : ℕ) : ℝ) := by push_cast; linarith
++  exact_mod_cast hcast
++
++/-- `minor_transcript_guarantees_all` with the width `logWidth N` of order `N² log N`: the
++commitment uses `logWidth N` coordinates and the outputs have at most
++`onlineMinorBitFormulaW (logWidth N) N` bits. -/
++theorem minor_transcript_guarantees_logWidth (fuel : ℕ) (hr : rD+rE=N)
++    (raw : ∀ J : Finset (NonzeroPairMinor D E),
++      NonzeroPairMinor D E → Option ((Fin J.card → ℚ) × ℚ))
++    (hraw : GoodRequestRows N (minorProxy D E fuel) raw)
++    (commit : ∀ J : Finset (NonzeroPairMinor D E), J → ℚ)
++    (hcommit : ∀ J, IsDissociated (minorProxy D E fuel) J →
++      ValidEpochCommit (fun j : J => minorProxy D E fuel j) (logWidth N)
++        (epochHeightFor N J.card) (commit J))
++    (hrestart : RestartTest (minorProxy D E fuel) (evaluateMinorRequest commit raw))
++    (indices : List (NonzeroPairMinor D E)) :
++    let st := RequestTrace.replay (evaluateMinorRequest commit raw) indices
++    ((st.restarts : ℝ) ≤ (7*(N:ℝ)^2+8)*Real.logb 2 (N+1)) ∧
++      ∃ f, ValidMinorAssignmentW (logWidth N) N (minorTrueLog D E) f ∧
++        ∀ u q, (u,q) ∈ st.replies → f u = q := by
++  exact ⟨RequestTrace.restarts_le _ _ hrestart _
++    (fun J hJ => (minorProxy_independent_bound_all D E fuel hr J hJ).1) indices,
++    all_prefixes_extend_W (logWidth N) N _ _ (minorProxy_close D E fuel)
++      (fun J hJ => minorProxy_independent_card_le_logWidth D E fuel hr J hJ)
++      raw hraw commit hcommit hrestart indices⟩
++
+ end Compression
+ end LinearProgramming
+ end Optimization
