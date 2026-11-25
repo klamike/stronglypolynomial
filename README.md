@@ -346,7 +346,7 @@ formal/SPLP/Approx.lean       approximately cleared markets: correctness and que
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 9100 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 9000 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
