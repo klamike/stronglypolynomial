@@ -304,8 +304,23 @@ algorithm:
   Lemmas 5.2 to 5.4.
 - The value of `K` and the count of queries per side decision.
 
-How the upstream Lean development handles this constant (from reading its sources; it was
-not built here, so nothing in this paragraph is checked by a compiler). Its `paperWidth N =
+Checked by the compiler in upstream's own development. With the width `(N+1)^6` replaced by
+the polynomial `(7N²+8)·N + 1`, the mathematical core of upstream's compression section
+builds: its theorem `minor_transcript_guarantees` (restart bound, and a common rational
+assignment for all nonzero minors with numerators and denominators below
+`2^(onlineMinorBitPolynomial.eval N)`) holds unchanged in form, with standard axioms only,
+and the polynomial in the exponent drops from degree 48 to degree 24 in `N` (for `N = 16`,
+from about `2^202` bits to about `2^129`). The change is three files and 52 lines of diff:
+[upstream-patches/core-width.patch](upstream-patches/core-width.patch), reproducible with
+[upstream-patches/build-core.sh](upstream-patches/build-core.sh) (Lean 4.34.1 and upstream's
+Mathlib revision; the unchanged core is built first as a control). The core is the 53
+modules that `MinorAssignments`, `AdaptiveRequests`, `BitBudget` and `Offline` import, and
+needs only Mathlib. Not yet covered: the layers above the core (the machine-model
+implementation and its cost accounting, 768 modules in all), which use the old closed form
+in about 25 places.
+
+How the upstream Lean development handles this constant (from reading its sources; apart
+from the core just described, nothing in this paragraph is checked by a compiler). Its `paperWidth N =
 (N+1)^6` occurs 88 times in 31 files of `Compression/`. The mathematical core is generic in a
 `width` with hypotheses of the form `I.card ≤ width` (`epoch_realization`,
 `epoch_commit_extends_accepted`, `exists_offline_assignment_of_dissociated_bound`); no step
@@ -469,7 +484,9 @@ Repository layout:
 README.md                  results, scope, open directions
 formal/                    the Lean project (library SPLP)
 scripts/fetch-upstream.sh  sparse checkout of openai/math into src/ (pinned commit)
-src/                       upstream reference checkout; not tracked, nothing depends on it
+src/                       upstream reference checkout; not tracked, nothing in formal/ depends on it
+upstream-patches/          patch and script that rebuild upstream's compression core with a smaller width
+upstream-build/            output of that script; not tracked
 ```
 
 To build from a fresh clone (needs [elan](https://github.com/leanprover/elan); the first

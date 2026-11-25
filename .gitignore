@@ -14,3 +14,6 @@
 
 # Local tool state
 .claude/settings.local.json
+
+# Trimmed local build of the upstream Lean development (see README)
+/upstream-build/
