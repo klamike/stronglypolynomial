@@ -39,4 +39,5 @@ import SPLP.ApproxLevel
 import SPLP.PairTest
 import SPLP.DiffConstraints
 import SPLP.BlockMinors
+import SPLP.Precision
 import SPLP.Summary

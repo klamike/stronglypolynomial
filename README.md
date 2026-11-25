@@ -286,7 +286,7 @@ algorithm:
   Lemmas 5.2 to 5.4.
 - The value of `K` and the count of queries per side decision.
 
-### 7. Lemma 3.1 does not need the preprint's precision (new, first step on `K`)
+### 7. The precision constants `H`, `P`, `K` can be much smaller (new)
 
 `log R` is of order `D⁴ K` (result 6), and `K ≈ (N+1) P` where `P ≈ 10⁴ N²` is the precision
 of calibration, fixed in the preprint by `H = 2^(100 N²)`, `ε = H^-10`, `2^-P = H^-100`.
@@ -315,15 +315,32 @@ diagonal blocks, a square minor is zero unless it uses as many positive columns 
 `C` (`det_eq_zero_of_block_card`), so a cofactor vector cannot be nonzero at a positive and
 at a negative slot (`block_minors_one_sided`): `h = h'` always.
 
-Not formalized (the first item is my reading of Section 4.3; the others are a reading of
+[formal/SPLP/Precision.lean](formal/SPLP/Precision.lean) does the same for the precision
+`P`, following the preprint's own proof of Theorem 3, which derives a coefficient bound
+`3^(j-1)` and then relaxes it to `2^(100 N²)`.
+
+- `coeff_bound`: for rows with pivot entries of magnitude one, zeros at earlier pivots and
+  entries at most two (the form calibration produces), a combination of sup norm at most one
+  has `j`th coefficient at most `3^j`, rows counted from zero. So `H = 3^(r-1)` serves for
+  `r` rows.
+- `label_test_sound`: let `B` be within `η` entrywise of rows `B*` on whose span `Q`
+  vanishes, and let `δ = r H η`. If `δ ≤ ε ≤ 1/(400 N)` and `δ ≤ 1/(500 N)`, then opposing
+  slots never both pass the test at threshold `1/4`, and every combination of `B*` with
+  coefficients at most `H`, entries in `[0, 1]` and an entry at least `1/3` makes the test
+  pass at that slot. These are the two facts the preprint's "Deciding all coordinates" uses.
+
+So `2^-P` of order `1/(N r H)` with `H = 3^(r-1)` is enough for the label test: `P` about
+`1.6 r + 2 log₂ N + 9`, linear in `N`, against `10⁴ N²`.
+
+Not formalized (the first item is my reading of Section 4.3; the others are readings of
 Section 4 by an agent, checked by me only in outline):
 
 - That the system of Section 4.3 is exactly the set of two-slot comparisons described above,
   for a block-diagonal basis. Given that, `2^K ≥ N · A` replaces `2^K ≥ (N+1) A^(N+1)` and
   `K ≈ P + log₂ P + log₂ N`, a factor `N` less in `K` and in `log R`.
-- The proof of Theorem 3 derives coefficient bounds `3^(j-1)` at row `j`, so `H ≥ 3^(r-1)`
-  with `r ≤ 2N` rows would do in place of `2^(100 N²)`, and then `P ≈ log₂ H + 2 log₂ N + 11`,
-  linear in `N`.
+- That calibration's rows have the form assumed in `coeff_bound`, and that nothing else in
+  Section 4 needs the larger `P`. The proof of Theorem 3 also uses `9e ≤ 2^-P` with
+  `e = 2^-(P+6)` and the bound `1/3` on visible entries, which do not depend on `H`.
 - The preprint's Sections 7 to 9 use other spaces `W`, where slots of both sides can occur
   in one cofactor vector (two-variable constraints with signs); the theorems here do not
   cover that case.
@@ -405,10 +422,11 @@ formal/SPLP/ApproxLevel.lean  the same with a constant tolerance (errors weighte
 formal/SPLP/PairTest.lean     Lemma 3.1 of the preprint with explicit constants
 formal/SPLP/DiffConstraints.lean  difference constraints: negative-cycle criterion, sign transfer
 formal/SPLP/BlockMinors.lean  cofactor vectors of a block-diagonal basis are one-sided
+formal/SPLP/Precision.lean    coefficient bound 3^j; the label test with explicit precision
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 10000 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 10300 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
