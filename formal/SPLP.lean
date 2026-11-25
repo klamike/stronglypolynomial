@@ -26,4 +26,5 @@ import SPLP.Eval
 import SPLP.Local
 import SPLP.Descent
 import SPLP.Margin
+import SPLP.LabelTest
 import SPLP.Summary

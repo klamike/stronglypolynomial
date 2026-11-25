@@ -15,9 +15,10 @@ turns sign labels, reliable only at slots of maximum surplus, into prices meetin
 of every consistent hypothesis. Its cost is counted in *probes*: each probe makes one label
 query and one market step (minimize a potential over an implicit pool of experts, then update
 their wealth). `formal/` formalizes that algorithm with all numerical constants as parameters,
-and proves four kinds of statements. The ones to read are in
-[formal/SPLP/Summary.lean](formal/SPLP/Summary.lean) and, for result 4, in
-[formal/SPLP/Margin.lean](formal/SPLP/Margin.lean).
+and proves five kinds of statements. The ones to read are in
+[formal/SPLP/Summary.lean](formal/SPLP/Summary.lean) and, for results 4 and 5, in
+[formal/SPLP/Margin.lean](formal/SPLP/Margin.lean) and
+[formal/SPLP/LabelTest.lean](formal/SPLP/LabelTest.lean).
 
 ### 1. Number of probes
 
@@ -179,6 +180,28 @@ therefore multiplies the query count by the cost of a full price search at every
 does not give `log R` cheap phases. The cause is that all slots in one rounded level look
 alike at grid points, while an exact label is guaranteed only for the single largest one.
 
+### 5. The label test has a margin governed by its tolerance (new, first step outside Theorem 2)
+
+In the preprint a label comes from a feasibility test at the queried prices: give `i` the
+label `+` if the scaled space has a vector with all entries at least `-ε` and `i`th entry at
+least `θ` (its Section 3, with `θ = 1/4`). [formal/SPLP/LabelTest.lean](formal/SPLP/LabelTest.lean)
+proves, for the test on the true scaled space:
+
+- `falsePositive_bound`, `falsePositive_bound_max`: if the test passes at `i`, every
+  nonnegative vector `u` of the orthogonal complement has scaled entry at `i` at most
+  `(N - 1) ε / θ` times its largest scaled entry. A wrong `+` therefore needs the true
+  witness to be invisible at `i` by that factor.
+- `exact_test_sound`: with `ε = 0` the test is never wrong.
+
+So the labels of the reduction are not merely correct at exact maxima. On the true scaled
+space they are correct within a margin of about `log₂ (θ / (N ε))` in the units of the
+demands, and that margin grows linearly with the bits of precision spent on the test. Not
+formalized: the preprint runs the test on a calibrated approximation and with compressed
+demands (its Sections 4 and 5), and I have not checked that a margin survives those steps.
+By result 4 a margin `G` allows demands rounded by `G`, which divides the range by `G` and
+so changes `log R` only by `log G`; by result 3 it allows descent steps of `G/2`. Neither
+lowers the exponent of the price search.
+
 ### Which arity
 
 Arity 4. In the table above it has the smallest exponent of `N` and a smaller power of `r₀`
@@ -241,10 +264,11 @@ formal/SPLP/Eval.lean         the potential as a sum over cells
 formal/SPLP/Local.lean        wealth relative to a node's input wealth (exact arithmetic)
 formal/SPLP/Descent.lean      descent without experts: exact labels in 2R queries, margins
 formal/SPLP/Margin.lean       margins, rounded demands, localization; rounding counterexample
+formal/SPLP/LabelTest.lean    the label test: tolerance gives a margin, exact tests are sound
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 7200 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 7300 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
