@@ -33,5 +33,6 @@ import SPLP.PolyCount
 import SPLP.CountArith
 import SPLP.Minors
 import SPLP.Dissociated
+import SPLP.RangeBound
 import SPLP.Approx
 import SPLP.Summary

@@ -249,9 +249,28 @@ restarts (from the counting inequality as a hypothesis). Both nevertheless keep 
 the constant in the parameters of Section 5 (upstream: `paperWidth N = (N+1)^6`). The point
 made here is that the constant itself can be replaced.
 
-Not formalized: that the rest of Section 5 goes through with the smaller constant. On my
-reading it does, because `D` is used there only as a bound on the size of dissociated sets
-(`|I| < D` in Lemma 5.2, `m < D` in Section 5.4) and in the definition of the grid `η`.
+What the constant is worth. [formal/SPLP/RangeBound.lean](formal/SPLP/RangeBound.lean)
+transcribes the preprint's formulas for the bound `F` on the substitutes (Lemmas 5.2 and 5.3
+and Section 5.4; the range is `R = 4F`) as a function `cF D K` of the constant `D` and the
+precision parameter `K`, and proves `D⁴ K ≤ log₂ (cF D K) ≤ 64 D⁴ (K + ⌈log₂ D⌉ + 3)`
+(`le_cF`, `cF_le`). So `log R` is of order `D⁴ K`: at least `(d+1)^24 K` with the preprint's
+constant (`cF_paper_ge`) and at most `64 (Dnew d)⁴ (K + ⌈log₂ (Dnew d)⌉ + 3)` with the new one
+(`cF_new_le`). The price search runs on a row basis with `d = 2N` columns, and `K` is about
+`10⁴ N³` with the preprint's precision, so `log R` goes from order `N^27` to order
+`N^11 log⁴ N`, and the bound on restarts from `(2N+1)^6` to `48 N² ⌈log₂ (2N+1)⌉`. Both
+multiply the number of label queries of a side decision: about `N^16 / log⁴ N` fewer from
+`log R`, on top of the restart bound that upstream already has.
+
+Not formalized, and the reason the last paragraph is an estimate and not a theorem about the
+algorithm:
+
+- That the rest of Section 5 goes through with the smaller constant. On my reading it does,
+  because `D` is used there only as a bound on the size of dissociated sets (`|I| < D` in
+  Lemma 5.2, `m < D` in Sections 5.4 and 5.5) and in the definition of the grid `η`.
+- That `cF` is the bound the algorithm needs. It is a transcription of the formulas in the
+  text with the largest admissible parameters, not derived from a formalization of
+  Lemmas 5.2 to 5.4.
+- The value of `K` and the count of queries per side decision.
 
 ### Which arity
 
@@ -322,11 +341,12 @@ formal/SPLP/PolyCount.lean    counting integer polynomials of bounded degree and
 formal/SPLP/Norm1.lean        the coefficient 1-norm
 formal/SPLP/Minors.lean       minors as integer polynomials in the matrix entries
 formal/SPLP/CountArith.lean   the counting inequality fails at the smaller constant
+formal/SPLP/RangeBound.lean   size of the preprint's demand bound as a function of its constant
 formal/SPLP/Approx.lean       approximately cleared markets: correctness and query bound
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 8700 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 9100 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
@@ -378,7 +398,8 @@ Informal reading of the preprint, for orientation only.
 - Probes: `T ≈ N^e · log R`, and `log R` is polynomial in `N` through calibration and
   compression (about `N^27` with the preprint's constants `D = (d+1)^6`, `H = 2^{100 N²}`;
   the upstream Lean development already has `(7N²+8) log₂(N+1)` restarts in place of
-  `(d+1)^6`).
+  `(d+1)^6`). With the smaller constant of result 6 carried into the parameters, `log R`
+  would be about `N^11 log⁴ N`.
 - Outside the price search: restarts of compression, `N` side decisions per recovered
   witness, and the primal-dual reduction multiply by low-degree polynomials.
 
@@ -434,8 +455,10 @@ stated:
 3. Markets cleared for approximate weights: proved (see "Markets may be cleared
    approximately"). Open: a formal procedure that produces the approximate weights from the
    cells, and whether the tolerance must be as small as `1/(2N)^46`. The proof charges the
-   error at every probe of the run; an expert's wealth only passes through the probes on one
-   root-to-leaf path, which suggests (not proved) a tolerance that is polylogarithmic.
+   error at every probe of the run at full weight, but a child node only receives the
+   invested share `c` of the wealth, so an error made `l` levels down should count with
+   weight `c^l`. For arity 4, `c · r < 1`, which suggests a tolerance independent of `N`
+   (in progress, not proved).
 4. Formalize the two missing pieces of the market step in an explicit cost model: the number
    of evaluations needed to reach a vertex minimizer, and counting the experts of a cell.
 5. Tighten the constants feeding `log R` (`H`, `P`, `K`) with proofs.
