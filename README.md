@@ -25,7 +25,12 @@ and proves seven kinds of statements. The ones to read are in
 ### 1. Number of probes
 
 All four algorithms below also round every updated wealth value down to 41 significant bits
-(see section 2); the preprint keeps wealth exact.
+(see section 2); the preprint keeps wealth exact. This is a deliberate change, not a
+restriction: the theorems below are proved for the rounded algorithms, with the loss of at
+most a factor `1 - 2^-40` per update absorbed by the constants. The general correctness
+theorem (`price_search_correct`) takes the rounding as a parameter and admits the identity
+(exact wealth); the four instances below fix it to 41 bits. The rounding is there because
+exact wealth values grow by about 21 bits per completed probe.
 
 | Theorem | Expert arity `k` | Probes per node `r` | Share `c` | Rate `η` | Label queries |
 | --- | --- | --- | --- | --- | --- |
