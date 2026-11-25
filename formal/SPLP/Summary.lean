@@ -6,6 +6,7 @@ import SPLP.VertexRun
 import SPLP.Eval
 import SPLP.Descent
 import SPLP.Approx
+import SPLP.ApproxLevel
 
 /-!
 # Summary: the price search with fewer probes
@@ -27,6 +28,10 @@ the same expert pool but different numerical constants and a sharper accounting.
   may minimize the potential for weights within total distance `ζ · (total wealth)` of the
   true wealth, with `ζ ≥ 2^-12 / (2N)^46` depending only on `N`; the root makes `2 r₀` probes
   and the run makes at most `4 r₀ (2N)^46` label queries. Wealth is still rounded.
+* `price_search_k4_approx_const_total`: the same with the constant tolerance `ζ = 2^-25`,
+  independent of `N`, of the range and of the pool. The error is charged level by level: a
+  child only receives the invested share of the wealth (`Exec.wealth_approx_level`,
+  `growthAt_zero_le_exp` in `SPLP/ApproxLevel.lean`).
 -/
 
 namespace SPLP
@@ -329,5 +334,28 @@ theorem price_search_k4_approx_total (val : V → ℝ) (hist₀ : ℕ → ι →
       (K4.ζ_pos K4_good 46 Fintype.card_pos).le oracle hist₀,
    fun X hX => price_search_k4_approx val X hist₀ hX,
    K4_ζ_ge _ Fintype.card_pos⟩
+
+/-- **Arity 4 with approximately cleared markets and a constant tolerance, end to end.** Let
+the root make `2 r₀` probes. Against any rule answering label queries there is a run;
+**every** run in which each proposal minimizes the potential for weights within total distance
+`2^-25 · (total wealth)` of the true wealth returns prices meeting all demands of every
+hypothesis consistent with the labels it received, and makes at most `4 r₀ (2N)^46` label
+queries. The tolerance does not depend on the number of coordinates, on the range of the
+demands or on the pool of experts. -/
+theorem price_search_k4_approx_const_total (val : V → ℝ) (hist₀ : ℕ → ι → ℝ) :
+    (∀ oracle : List ℕ → (ι → ℝ) → (ι → Bool),
+      ∃ X : Exec ι (Expert ι V 4 (K4.depth K4_good (Fintype.card ι))),
+        X.ValidWith (approxMarket val (1 / 2 ^ 25))
+          (K4.algRoot ι V val (2 * K4.r₀ ι V (K4.depth K4_good (Fintype.card ι)))) 0 hist₀
+          (fun _ => 1) ∧ X.LabelsFrom oracle []) ∧
+    (∀ X : Exec ι (Expert ι V 4 (K4.depth K4_good (Fintype.card ι))),
+      X.ValidWith (approxMarket val (1 / 2 ^ 25))
+          (K4.algRoot ι V val (2 * K4.r₀ ι V (K4.depth K4_good (Fintype.card ι)))) 0 hist₀
+          (fun _ => 1) →
+        (∀ H : Hyp ι V, X.Consistent val H → ∀ s ∈ H.S, val (H.a s) ≤ sp X.x s) ∧
+        X.queries ≤ 4 * K4.r₀ ι V (K4.depth K4_good (Fintype.card ι))
+          * (2 * Fintype.card ι) ^ 46) :=
+  ⟨fun oracle => K4.exists_approx_run K4_good (by norm_num) val _ (by positivity) oracle hist₀,
+   fun X hX => price_search_k4_approx_const val X hist₀ hX⟩
 
 end SPLP
