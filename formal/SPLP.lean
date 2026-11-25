@@ -44,3 +44,5 @@ import SPLP.DiffConstraints
 import SPLP.BlockMinors
 import SPLP.Precision
 import SPLP.Summary
+import SPLP.Strategy
+import SPLP.UpstreamModel
