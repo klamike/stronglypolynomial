@@ -373,10 +373,12 @@ axioms, and:
 The parameter changes alone give `x^1382`; the rest comes from one added lemma,
 `(2N)^10 ≤ (N+1)^13`, used in place of `2(N+1) ≤ x²` when the per-trial bound is written as
 a power of `x`. What remains is structural: the `557` is forced by upstream's charging
-constant `σ = 2^-272`, and that is the whole gap to the `(2N)^46` proved in `formal/` for
-the same recursion with the constants of result 1. Carrying that sharper analysis into
-upstream's development is not a local change, because its machine-model layer implements
-its own version of the search.
+constant `σ = 2^-272`, and that accounts for the gap to the `(2N)^46` proved in `formal/`
+(result 1) for the preprint's recursion. Upstream's formal search is its own, cruder
+variant of that recursion (by the agent's reading: depth `log₂ N + 1`, skeletons on 64
+coordinates, majority votes over the rounds), so carrying the sharper analysis into
+upstream's development is not a local change; its machine-model layer implements that
+variant.
 
 How the upstream Lean development handles this constant (from reading its sources; apart
 from the core just described, nothing in this paragraph is checked by a compiler). Its `paperWidth N =
