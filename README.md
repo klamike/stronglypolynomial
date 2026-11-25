@@ -328,9 +328,19 @@ standard axioms only. Evaluated, the base-two logarithm of that exponent grows b
 upstream's machine-model layer requires, so it is a statement about the mathematics of the
 section only.
 
-Not yet covered: the layers above the core (the machine-model
-implementation and its cost accounting, 769 modules in all), which use the old closed form
-in about 25 places.
+The layers above the core also build with the polynomial width
+([upstream-patches/full-width.patch](upstream-patches/full-width.patch), 308 lines, with a
+list of every edit in [upstream-patches/WIDTH-REPORT.md](upstream-patches/WIDTH-REPORT.md)).
+All 769 modules in the import closure of the files that mention `paperWidth` build, and so
+do the modules that state upstream's compression theorem on its machine model
+(`onlineMinorCompression : OnlineMinorLogCompression`, their Theorem 1.4), with standard
+axioms only. Beyond the three core files the patch changes no statement: it adds the lemma
+`paperWidth N ≤ (N+1)^6`, a monotonicity lemma, the body of one private definition that
+computes the width, and 17 proof repairs that replace a definitional use of the old closed
+form by that lemma. Upstream's fuel, clock and degree bounds stated with `(N+1)^6` are kept
+as over-estimates, so its running-time polynomials are unchanged by this patch; what
+changes is the bound on the compressed values and hence on the range `R` of the price
+search.
 
 How the upstream Lean development handles this constant (from reading its sources; apart
 from the core just described, nothing in this paragraph is checked by a compiler). Its `paperWidth N =

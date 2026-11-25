@@ -1,0 +1,308 @@
+--- OAI/Optimization/LinearProgramming/Compression/AdaptiveRequests.lean
++++ OAI/Optimization/LinearProgramming/Compression/AdaptiveRequests.lean
+@@ -17,8 +17,20 @@
+ 
+ def paperRadius (N : ℕ) : ℕ := 100*(N+1)^3
+ def paperGrid (N : ℕ) : ℕ := 2^(paperRadius N+7)
+-def paperWidth (N : ℕ) : ℕ := (N+1)^6
++def paperWidth (N : ℕ) : ℕ := (7*N^2+8)*N+1
+ 
++/-- The polynomial width is below upstream's original closed form `(N+1)^6`; downstream
++resource bounds that were stated for the old width remain valid upper bounds. -/
++theorem paperWidth_le_pow (N : ℕ) : paperWidth N ≤ (N+1)^6 := by
++  unfold paperWidth
++  have h : (N+1)^6 = N^6+6*N^5+15*N^4+20*N^3+15*N^2+6*N+1 := by ring
++  have h1 : (7*N^2+8)*N+1 = 7*N^3+8*N+1 := by ring
++  have h2 : N ≤ N^2 := Nat.le_self_pow (by norm_num) N
++  rw [h, h1]
++  have := Nat.zero_le (N^6); have := Nat.zero_le (N^5); have := Nat.zero_le (N^4)
++  have := Nat.zero_le (N^3)
++  omega
++
+ def epochCandidateHeight (N k : ℕ) : ℕ := requestCutoff (k+1)*paperGrid N
+ 
+ def epochHeightFor (N k : ℕ) : ℕ :=
+--- OAI/Optimization/LinearProgramming/Compression/BitBudget.lean
++++ OAI/Optimization/LinearProgramming/Compression/BitBudget.lean
+@@ -181,7 +181,7 @@
+ /-- The composition of the preceding bounds, interpreted over any commutative
+ semiring so that it can be used both as an actual polynomial and as a natural budget. -/
+ def onlineMinorBitFormula {R : Type*} [CommSemiring R] (N : R) : R :=
+-  let w := (N+1)^6
++  let w := (7*N^2+8)*N+1
+   let B := 100*(N+1)^3
+   let a := (2*w+B+14)+B+8
+   let L := ((B+17)+(2+a)+1)+((B+7)+a*4)
+@@ -207,8 +207,8 @@
+ 
+ /-- The numerical output bound for the manuscript constants, written as a power of
+ two with the same polynomial exponent in every dimension and every epoch. -/
+-theorem fiber_manuscript_value_height (N k dim : ℕ) (hk : k ≤ (N+1)^6) (hd : dim ≤ (N+1)^6) :
+-    let width := (N+1)^6
++theorem fiber_manuscript_value_height (N k dim : ℕ) (hk : k ≤ (7*N^2+8)*N+1) (hd : dim ≤ (7*N^2+8)*N+1) :
++    let width := (7*N^2+8)*N+1
+     let B := 100*(N+1)^3
+     let E := (2:ℕ)^(B+7)
+     let C := max (requestCutoff (k+1)*E) (2*E)
+--- OAI/Optimization/LinearProgramming/Compression/InnerParameterSize.lean
++++ OAI/Optimization/LinearProgramming/Compression/InnerParameterSize.lean
+@@ -24,9 +24,10 @@
+     (inputEncoding x).length≤B ∧ (inputCode x).length≤B ∧
+       (g+1)+(epochFormBudget g (paperWidth N) (epochHeightFor N g)).size+12≤B ∧ (g+2)+((g+3)*(requestCutoff (g+1)+3)).size+12≤B := by
+   intro x B
++  have hg := hg.trans (paperWidth_le_pow N)
+   have hb : rank.size≤rank := Nat.size_le.mpr (Nat.lt_two_pow_self (n := rank))
+   have dim : (RoundingBudgets.inputsCode (N,g)).length≤basePolynomial.eval N := by
+-    simp [RoundingBudgets.inputsCode,prodCode,pairBits_length,unaryCode,basePolynomial,paperWidth] at hg ⊢
++    simp [RoundingBudgets.inputsCode,prodCode,pairBits_length,unaryCode,basePolynomial] at hg ⊢
+     omega
+   have el := RoundingBudgets.epochInputP.output_length_le (N,g)
+   have rl := RoundingBudgets.requestInputP.output_length_le (N,g)
+@@ -46,9 +47,9 @@
+   have hw : (inputEncoding x).length≤basePolynomial.eval N := by
+     simp only [x,inputEncoding,inputWord,List.length_append,List.length_cons,List.length_nil,frame_length,
+       List.length_replicate,Contraction.encodeNat_length]
+-    simp [basePolynomial,paperWidth] at hg ⊢; omega
++    simp [basePolynomial] at hg ⊢; omega
+   have hi : (inputCode x).length≤basePolynomial.eval N := by
+-    simp [inputCode,x,prodCode,pairBits_length,unaryCode,boolCode,basePolynomial,paperWidth,Nat.size_eq_bits_len] at hg ⊢
++    simp [inputCode,x,prodCode,pairBits_length,unaryCode,boolCode,basePolynomial,Nat.size_eq_bits_len] at hg ⊢
+     omega
+   have eB : B=basePolynomial.eval N+RoundingBudgets.epochInputP.bound.eval (basePolynomial.eval N)+
+       RoundingBudgets.requestInputP.bound.eval (basePolynomial.eval N)+16 := by simp [B,parameterPolynomial]
+--- OAI/Optimization/LinearProgramming/Compression/MinorAssignments.lean
++++ OAI/Optimization/LinearProgramming/Compression/MinorAssignments.lean
+@@ -68,9 +68,14 @@
+   have h := dissociated_nonzeroPairMinor_card_le D E hN hr (Rat.castHom ℝ)
+     Rat.cast_injective J (minorProxy D E fuel) (fun i _ => hclose i) hJ
+   refine ⟨h, ?_⟩
+-  have hc := h.trans_lt (log_bound_lt_cutoff N)
++  have hr2 : (N:ℝ) + 1 ≤ (2:ℝ)^N := by exact_mod_cast N.lt_two_pow_self
++  have hl := Real.logb_le_logb_of_le (by norm_num : (1:ℝ) < 2) (by positivity) hr2
++  rw [Real.logb_pow, Real.logb_self_eq_one (by norm_num : (1:ℝ) < 2), mul_one] at hl
++  have hc : (J.card : ℝ) ≤ (7*(N:ℝ)^2+8)*N :=
++    h.trans (mul_le_mul_of_nonneg_left hl (by positivity))
+   unfold paperWidth
+-  exact_mod_cast hc.le
++  have hcast : (J.card : ℝ) ≤ (((7*N^2+8)*N+1 : ℕ) : ℝ) := by push_cast; linarith
++  exact_mod_cast hcast
+ 
+ /-- Every square minor of a matrix with no columns is the empty minor. -/
+ theorem minorMagnitude_zero_columns (D₀ : Matrix (Fin rD) (Fin 0) ℚ)
+--- OAI/Optimization/LinearProgramming/Compression/NumericMinorROM.lean
++++ OAI/Optimization/LinearProgramming/Compression/NumericMinorROM.lean
+@@ -46,7 +46,7 @@
+   have ports := sc.ports.transfer (fun i hi => effect.headers i (by omega) (by omega)
+     (by change i≠49;omega))
+   have resident := sc.resident.transferWindow (fun i hi upto => effect.data (2*i) (by omega) (Or.inl (by omega))) effect.even
+-  have growth : n+g+1≤n+(n+1)^6+1 := by change g≤(n+1)^6 at width;omega
++  have growth : n+g+1≤n+(n+1)^6+1 := by have := width.trans (paperWidth_le_pow n);omega
+   refine ⟨t,(setup.seq (Fragment.Run.ofBlock (P := P) load)).mono ?_,vm,ports,resident,sc.capacity,sc.code,sc.row⟩
+   have clock : k≤300*(n+(n+1)^6+1)^2+Inner.machine.stackCount+100 := hk.trans
+     (Nat.add_le_add_right (Nat.add_le_add_right (Nat.mul_le_mul_left 300 (Nat.pow_le_pow_left growth 2)) _) _)
+--- OAI/Optimization/LinearProgramming/Compression/NumericROMBounds.lean
++++ OAI/Optimization/LinearProgramming/Compression/NumericROMBounds.lean
+@@ -43,7 +43,7 @@
+   100*(arity+manuscriptProxyFuelPolynomial+parameterGridExponent+eff P+1)^3
+ 
+ private theorem arity_le {n g : ℕ} (hg : g≤paperWidth n) : g+1≤arity.eval n := by
+-  simpa [arity,paperWidth] using Nat.add_le_add_right hg 1
++  simpa [arity] using Nat.add_le_add_right (hg.trans (paperWidth_le_pow n)) 1
+ 
+ private theorem eff_le (P : Polynomial ℕ) (n B : ℕ) : effectiveB n B (P.eval n) ≤ (eff P).eval (n+B) := by
+   have hc := numericProxyCacheBits_le n B
+@@ -123,7 +123,7 @@
+     2*(R.eval n+(P.eval n+1)*(cachedProxySignSteps (g+1) (manuscriptProxyFuel n)
+       (symbolicQueryCap (g+1) (manuscriptProxyFuel n))+5))+135+2*(rowBase+g+2) ≤ (window R P).eval n := by
+   have cb := (cache_le_callback (g+1) (manuscriptProxyFuel n) _).trans (callbackTime_le n g hg)
+-  change g≤(n+1)^6 at hg
++  have hg := hg.trans (paperWidth_le_pow n)
+   simp only [window,Polynomial.eval_add,Polynomial.eval_mul,Polynomial.eval_one,Polynomial.eval_ofNat,
+     Polynomial.eval_pow,Polynomial.eval_X]
+   gcongr
+--- OAI/Optimization/LinearProgramming/Compression/ProxyFuelQueries.lean
++++ OAI/Optimization/LinearProgramming/Compression/ProxyFuelQueries.lean
+@@ -14,14 +14,23 @@
+ open scoped BigOperators
+ open OAI.Optimization.LinearProgramming.Lattice
+ 
++/-- The projection budget is a sum over `range (width+1)`, hence monotone in the width. -/
++private theorem fiberProjectionBudget_mono_width (k H : ℕ) {w w' : ℕ} (h : w ≤ w') :
++    fiberProjectionBudget k w H ≤ fiberProjectionBudget k w' H :=
++  Finset.sum_le_sum_of_subset (Finset.range_mono (Nat.succ_le_succ h))
++
+ /-- The attainable query width in the commitment to the generator coordinates. -/
+ theorem manuscript_commit_fuel (N j : ℕ) (hj : j ≤ paperWidth N) :
+     let M := (j+1)*fiberProjectionBudget j (paperWidth N) (epochHeightFor N j)+1
+     paperRadius N+7+(j+1)+queryCoefficientWidth (j+1) M ≤ manuscriptProxyFuel N := by
+   dsimp only
+   apply manuscript_rounding_fuel
+-  · unfold paperWidth at hj; omega
+-  · exact manuscript_commit_inputWidth N j hj
++  · have := paperWidth_le_pow N; omega
++  · have h := manuscript_commit_inputWidth N j (hj.trans (paperWidth_le_pow N))
++    dsimp only at h
++    refine (Nat.size_le_size ?_).trans h
++    exact Nat.add_le_add_right (Nat.mul_le_mul_left _
++      (fiberProjectionBudget_mono_width j _ (paperWidth_le_pow N))) 1
+ 
+ /-- The attainable width when sign rounding is used on the generator list plus the request. -/
+ theorem manuscript_request_fuel (N j : ℕ) (hj : j ≤ paperWidth N) :
+@@ -30,8 +39,8 @@
+     paperRadius N+7+(d+1)+queryCoefficientWidth (d+1) M ≤ manuscriptProxyFuel N := by
+   dsimp only
+   apply manuscript_rounding_fuel
+-  · unfold paperWidth at hj; omega
+-  · exact manuscript_request_inputWidth N j hj
++  · have := paperWidth_le_pow N; omega
++  · exact manuscript_request_inputWidth N j (hj.trans (paperWidth_le_pow N))
+ 
+ /-- For either rounding call, the global cutoff controls the full affine L1 norm,
+ including the separate constant term, on the actual history of the supplied selector. -/
+@@ -78,7 +87,7 @@
+   apply gridArgs_scaled_le_pow w oracle z last hshort mid hmid
+   unfold manuscriptProxyFuel manuscriptProxyFuelFormula paperRadius
+   dsimp only
+-  unfold paperWidth at hj
++  have hj := hj.trans (paperWidth_le_pow N)
+   omega
+ 
+ end Compression
+--- OAI/Optimization/LinearProgramming/Compression/ProxyHomogeneousFuel.lean
++++ OAI/Optimization/LinearProgramming/Compression/ProxyHomogeneousFuel.lean
+@@ -20,7 +20,7 @@
+   have hu : m ≤ u := by dsimp [u]; omega
+   have hprod : u ≤ u*((w+2)+2) := Nat.le_mul_of_pos_right _ (by omega)
+   have hQ : u*((w+2)+2) ≤ Q := by unfold Q proxyQueryWidthFormula; dsimp only [u]; omega
+-  change d ≤ w+1 at hd
++  have hd : d ≤ w+1 := hd.trans (Nat.add_le_add_right (paperWidth_le_pow N) 1)
+   change (B+7)+(2*(B+7)+8*d+30) ≤ (B+7)+(w+2)+Q+(4*w+2*B+40)
+   omega
+ 
+--- OAI/Optimization/LinearProgramming/Compression/ProxyNumericComplexity.lean
++++ OAI/Optimization/LinearProgramming/Compression/ProxyNumericComplexity.lean
+@@ -57,7 +57,7 @@
+   let r := numericCacheAddressEnd N
+   let b := initPolynomial.eval N
+   have hp := (init_resources N).1
+-  have hw : g ≤ (N+1)^6 := hg
++  have hw : g ≤ (N+1)^6 := hg.trans (paperWidth_le_pow N)
+   have harg : (g+1)+f+k+(g+8)+r ≤ cacheInputPolynomial.eval N := by
+     simp only [cacheInputPolynomial,eval_add,eval_pow,eval_X,eval_one,eval_ofNat,
+       manuscriptProxyFuelPolynomial_eval,parameterGridExponent_eval]
+--- OAI/Optimization/LinearProgramming/Compression/RequestGraphInputSize.lean
++++ OAI/Optimization/LinearProgramming/Compression/RequestGraphInputSize.lean
+@@ -42,7 +42,7 @@
+   apply h.trans
+   rw [paperInputPolynomial_eval]
+   simp only [paperGrid,Nat.size_pow]
+-  have hd : n+1 ≤ (N+1)^6+1 := Nat.add_le_add_right hn 1
++  have hd : n+1 ≤ (N+1)^6+1 := Nat.add_le_add_right (hn.trans (paperWidth_le_pow N)) 1
+   change 2*((paperRadius N+7)+1)+(n+1)*(6*L+22)+2 ≤
+     2*((paperRadius N+7)+1)+((N+1)^6+1)*(6*RequestScreen.requestRoundBitsFormula ((N+1)^6+1)+22)+2
+   have hw := round_width_mono hd
+--- OAI/Optimization/LinearProgramming/Compression/RoundingBudgets.lean
++++ OAI/Optimization/LinearProgramming/Compression/RoundingBudgets.lean
+@@ -57,7 +57,8 @@
+ private noncomputable def radius (n : U e a) : U e (fun x => paperRadius (a x)) :=
+   umul (uconst e 100) (upow (uadd n (uconst e 1)) 3)
+ 
+-private noncomputable def width (n : U e a) : U e (fun x => paperWidth (a x)) := upow (uadd n (uconst e 1)) 6
++private noncomputable def width (n : U e a) : U e (fun x => paperWidth (a x)) :=
++  uadd (umul (uadd (umul (uconst e 7) (upow n 2)) (uconst e 8)) n) (uconst e 1)
+ 
+ private noncomputable def height (n : U e a) (g : U e b) : B e (fun x => epochHeightFor (a x) (b x)) := by
+   let r := radius n
+@@ -151,7 +152,7 @@
+       (values n g).1.bits.length+(values n g).2.bits.length ≤ budgetBound.eval n := by
+   obtain ⟨c,hc,run,hw⟩ := run_and_word_bound n g
+   have hi : 2*n+g+1 ≤ widthInputBound.eval n := by
+-    change g ≤ (n+1)^6 at hg
++    have hg := hg.trans (paperWidth_le_pow n)
+     simpa [widthInputBound] using Nat.add_le_add_right (Nat.add_le_add_left hg (2*n)) 1
+   have hsum : 2*n+g+1+both.bound.eval (2*n+g+1) ≤ budgetBound.eval n := by
+     simpa only [budgetBound,Polynomial.eval_add,Polynomial.eval_comp] using
+--- OAI/Optimization/LinearProgramming/Compression/ServiceBudget.lean
++++ OAI/Optimization/LinearProgramming/Compression/ServiceBudget.lean
+@@ -36,7 +36,8 @@
+   let L := totalBits (entries D++entries E)
+   let mag := matrixMinorCache D E J u
+   have hn : n ≤ L := dimension_le_bits D E hdim
+-  have hc : J.card ≤ (L+1)^6 := hg.trans (Nat.pow_le_pow_left (by omega) _)
++  have hc : J.card ≤ (L+1)^6 :=
++    (hg.trans (paperWidth_le_pow n)).trans (Nat.pow_le_pow_left (by omega) _)
+   have each (i : Fin (J.card+1)) : ratBits (mag i) ≤ 3+2*L^2+2*L^4 := by
+     change ratBits (minorMagnitude D E (requestIndices J u i)) ≤ _
+     rw [minorMagnitude,evaluatePairMinor_eq,magnitude_bits]
+--- OAI/Optimization/LinearProgramming/Compression/ServiceImplementation.lean
++++ OAI/Optimization/LinearProgramming/Compression/ServiceImplementation.lean
+@@ -34,6 +34,7 @@
+   let P := fun x => ratBits x ≤ H
+   let src := resume s (words pub.val)
+   have hg : J.card ≤ paperWidth n := (minorProxy_independent_bound_all D E _ hd J hJ).2
++  have hg6 : J.card ≤ (n+1)^6 := hg.trans (paperWidth_le_pow n)
+   have magSize := ServiceBudget.magnitudeInput_le D E hd J q hg
+   have nB := ServiceBudget.dimension_le_bits D E hd
+   obtain ⟨inputSize,innerSize,outputSize⟩ :=
+@@ -41,7 +42,7 @@
+   have initialBound : 50*(B+1)^6 ≤ H := inputSize.trans hnative
+   have H3 : 3 ≤ H := by have h := Nat.one_le_pow 6 (B+1) (Nat.succ_pos B); omega
+   have countSize : ratBits ((J.card+1:ℕ):ℚ) ≤ H := by
+-    have h := (inspectHeight_bound D E hd hg).2
++    have h := (inspectHeight_bound D E hd hg6).2
+     exact (nat_bits_le _).trans (by change 3+max (4*(n+1)^2) (J.card+1) ≤ 50*(B+1)^6 at h; omega)
+   have counters (i : ℕ) (hi : i ≤ 3+2*onlineMinorBitPolynomial.eval n) : ratBits (i:ℚ) ≤ H := by
+     have h := outputSize.trans hnative
+@@ -51,7 +52,7 @@
+     have size := hf.output_bits q
+     rw [agree q v ok] at size
+     exact size
+-  obtain ⟨x,k,hk,first,ins,tape⟩ := inspectAndGather_native D E J H s pub hd persist hg initialBound
++  obtain ⟨x,k,hk,first,ins,tape⟩ := inspectAndGather_native D E J H s pub hd persist hg6 initialBound
+   obtain ⟨prepared,last,middle,computation,ready,returned,emitted,valueOne⟩ :=
+     ServiceDecision.run D E solver J q H x ins tape hg H3 (innerSize.trans hnative)
+   have capacity := (ServiceBudget.capacity_bounds time rom n J.card hg).2.2
+--- OAI/Optimization/LinearProgramming/Compression/ServiceParameters.lean
++++ OAI/Optimization/LinearProgramming/Compression/ServiceParameters.lean
+@@ -18,7 +18,7 @@
+ def live (n g : ℕ) := slotBase n (g+2)+g+1
+ 
+ theorem live_le (n g : ℕ) (hg : g ≤ paperWidth n) : live n g ≤ 30*(n+1)^8 := by
+-  change g ≤ (n+1)^6 at hg
++  have hg := hg.trans (paperWidth_le_pow n)
+   calc
+     live n g ≤ 7+n*n+((n+1)^6+2)*(2*n+3)+(n+1)^6+1 := by
+       unfold live slotBase tableBase stride
+--- OAI/Optimization/LinearProgramming/Compression/ServiceResources.lean
++++ OAI/Optimization/LinearProgramming/Compression/ServiceResources.lean
+@@ -33,7 +33,7 @@
+ theorem time_le (time : Polynomial ℕ) (rom n g : ℕ) (hg : g ≤ paperWidth n) :
+     totalWork time rom n g ≤ (timePolynomial time rom).eval n := by
+   have lg := live_le n g hg
+-  change g ≤ (n+1)^6 at hg
++  have hg := hg.trans (paperWidth_le_pow n)
+   simp only [totalWork,ServicePrepare.work,postWork,timePolynomial,capacity,stride,eval_add,
+     eval_mul,eval_pow,eval_C,eval_X,eval_one,eval_ofNat]
+   gcongr
+--- OAI/Optimization/LinearProgramming/Compression/SignWireInitialResidentBound.lean
++++ OAI/Optimization/LinearProgramming/Compression/SignWireInitialResidentBound.lean
+@@ -38,7 +38,7 @@
+       initialResidentClockPolynomial.eval N := by
+   let d := (N+1)^6+1
+   let f := manuscriptProxyFuel N
+-  have hg : g+1≤d := Nat.add_le_add_right (show g≤(N+1)^6 from width) 1
++  have hg : g+1≤d := Nat.add_le_add_right (width.trans (paperWidth_le_pow N)) 1
+   have evalClock : initialResidentClockPolynomial.eval N =
+       initialResidentTermsCost.eval (cacheSeedPolynomial.eval N)+symbolicWorkspaceSteps d f := by
+     simp [initialResidentClockPolynomial,symbolicWorkspaceSteps,d,f,manuscriptProxyFuelPolynomial_eval]
+--- OAI/Optimization/LinearProgramming/Compression/SignWireNumericFootprint.lean
++++ OAI/Optimization/LinearProgramming/Compression/SignWireNumericFootprint.lean
+@@ -24,7 +24,7 @@
+       (numericProxyCacheSteps N g) t) : Footprint (cacheSeedPolynomial.eval N) (t.atPC 0) := by
+   let budget := addressBudget (numericProxyCache.program 0)
+   let S := N + (N+1)^6 + (budget+5)
+-  have hg : g≤(N+1)^6 := width
++  have hg : g≤(N+1)^6 := width.trans (paperWidth_le_pow N)
+   have bit : member.toNat≤1 := by cases member <;> decide
+   have tape : (List.ofFn mag).length≤S := by
+     rw [List.length_ofFn]
