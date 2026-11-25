@@ -292,6 +292,15 @@ provided `q < ((θ - ε)/2)² - 2ε(N - 1)` (`opposing_slots`); for `θ = 1/4` i
 `ε ≤ 1/(400 N)` and `Q ≤ 1/100` (`opposing_slots_quarter`). So this lemma needs a tolerance
 of order `1/N`, not `2^(-1000 N²)`.
 
+[formal/SPLP/DiffConstraints.lean](formal/SPLP/DiffConstraints.lean) proves the fact that
+would remove a factor `N` from `K`. A system of difference constraints `p_i - p_j ≤ w_ij` is
+feasible exactly when no closed walk with at most `n` vertices has negative weight
+(`diff_feasible_iff`, `n` the number of unknowns). Hence, if the weights are integer affine
+forms of 1-norm at most `A` in some data, feasibility at data `g` passes to any data `f` on
+which every form of norm at most `n · A` that is nonnegative at `g` is nonnegative
+(`diff_feasible_of_type`). The preprint's Lemma 4.1, for a general system, needs agreement up
+to norm `(n+1) A^(n+1)`.
+
 Not formalized (a reading of the preprint's Section 4, by an agent, checked by me only in
 outline):
 
@@ -301,9 +310,10 @@ outline):
 - `K` is defined through `2^K ≥ (N+1) A^(N+1)` because the `N` prices are eliminated from a
   general linear system. The inequalities being eliminated compare two slots of one cofactor
   vector and contain two prices with unit coefficients. If they are difference constraints
-  (which holds when both slots lie on the same side), feasibility is the absence of a
-  negative cycle, cycles have at most `N` edges, and `2^K ≥ N · A` suffices, giving
-  `K ≈ P + log₂ P + log₂ N`.
+  (which holds when both slots lie on the same side), `diff_feasible_of_type` applies and
+  `2^K ≥ N · A` suffices, giving `K ≈ P + log₂ P + log₂ N`. Whether the preprint's system
+  has this form is the unverified step; its strict inequalities and the mixed-side case
+  (two-variable constraints with signs) are also not covered by the theorem.
 - Together: `K` from about `10⁴ N³` to about `2N` to `4N`, and `log R` to order
   `N⁹ log⁴ N`. Later sections of the preprint reuse these constants and were not checked.
 
@@ -380,10 +390,11 @@ formal/SPLP/RangeBound.lean   size of the preprint's demand bound as a function 
 formal/SPLP/Approx.lean       approximately cleared markets: correctness and query bound
 formal/SPLP/ApproxLevel.lean  the same with a constant tolerance (errors weighted by invested share)
 formal/SPLP/PairTest.lean     Lemma 3.1 of the preprint with explicit constants
+formal/SPLP/DiffConstraints.lean  difference constraints: negative-cycle criterion, sign transfer
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 9500 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 9900 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:

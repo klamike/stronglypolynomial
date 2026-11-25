@@ -37,4 +37,5 @@ import SPLP.RangeBound
 import SPLP.Approx
 import SPLP.ApproxLevel
 import SPLP.PairTest
+import SPLP.DiffConstraints
 import SPLP.Summary
