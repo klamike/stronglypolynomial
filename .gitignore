@@ -1,0 +1,16 @@
+# Lean / Lake build output and downloaded dependencies
+.lake/
+*.olean
+*.ilean
+
+# Upstream reference checkout of github.com/openai/math (see scripts/fetch-upstream.sh)
+/src/
+
+# OS and editor files
+.DS_Store
+*.swp
+*~
+.idea/
+
+# Local tool state
+.claude/settings.local.json
