@@ -27,4 +27,10 @@ import SPLP.Local
 import SPLP.Descent
 import SPLP.Margin
 import SPLP.LabelTest
+import SPLP.Norm1
+import SPLP.SubsetSums
+import SPLP.PolyCount
+import SPLP.CountArith
+import SPLP.Minors
+import SPLP.Dissociated
 import SPLP.Summary

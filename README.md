@@ -15,10 +15,11 @@ turns sign labels, reliable only at slots of maximum surplus, into prices meetin
 of every consistent hypothesis. Its cost is counted in *probes*: each probe makes one label
 query and one market step (minimize a potential over an implicit pool of experts, then update
 their wealth). `formal/` formalizes that algorithm with all numerical constants as parameters,
-and proves five kinds of statements. The ones to read are in
-[formal/SPLP/Summary.lean](formal/SPLP/Summary.lean) and, for results 4 and 5, in
-[formal/SPLP/Margin.lean](formal/SPLP/Margin.lean) and
-[formal/SPLP/LabelTest.lean](formal/SPLP/LabelTest.lean).
+and proves six kinds of statements. The ones to read are in
+[formal/SPLP/Summary.lean](formal/SPLP/Summary.lean) and, for results 4 to 6, in
+[formal/SPLP/Margin.lean](formal/SPLP/Margin.lean),
+[formal/SPLP/LabelTest.lean](formal/SPLP/LabelTest.lean) and
+[formal/SPLP/Dissociated.lean](formal/SPLP/Dissociated.lean).
 
 ### 1. Number of probes
 
@@ -202,6 +203,42 @@ By result 4 a margin `G` allows demands rounded by `G`, which divides the range 
 so changes `log R` only by `log G`; by result 3 it allows descent steps of `G/2`. Neither
 lowers the exponent of the price search.
 
+### 6. The compression constant: `d² log d` instead of `(d+1)^6` (new, the preprint's Section 5)
+
+The range `R` of the demands is not a property of the linear program. It is the size of the
+short substitutes that the preprint's Section 5 computes for the logarithms of the minors
+(Frank–Tardos rounding, on demand). That section fixes one constant, `D = (d+1)^6`, as a bound
+on the size of a *dissociated* set of minors: one whose log-magnitudes have subset sums
+pairwise far apart (its Lemma 5.1). `D` bounds the number of restarts of the price search and
+enters every parameter that determines `R`.
+
+[formal/SPLP/Dissociated.lean](formal/SPLP/Dissociated.lean) formalizes the counting argument
+of Lemma 5.1 and shows that a much smaller constant suffices.
+
+- `dissociated_count`: for a dissociated family of `D` integer polynomials in `n` variables,
+  with individual degrees at most `δ` and coefficient 1-norms at most `L`, evaluated at any
+  real point, `2^(2^D) ≤ (2 · 2^D · L^D + 1)^((δ D + 1)^n)`. The proof is the preprint's:
+  subset products have magnitudes that more than double in sorted order, so all `2^(2^D)`
+  subset sums of subset products are distinct values (`subsetSum_injective_of_sep`), hence
+  distinct polynomials, and there are few polynomials of that shape
+  (`card_le_of_degreeOf_norm1`).
+- `minors_dissociated_card_lt`: every dissociated family of nonzero minors of a real matrix
+  with at most `d` rows and `d` columns has fewer than `Dnew d = 12 d² ⌈log₂ (d+1)⌉` members.
+  Minors are polynomials with individual degrees at most one and 1-norm at most `d!`
+  (`Minors.lean`). `minors_proxy_dissociated_card_lt` is the same statement in the preprint's
+  form, with proxies within `η` of the logarithms and tolerance two.
+- `Dnew_lt_paper`: `Dnew d < (d+1)^6` for every `d ≥ 1`.
+
+What is and is not new here. The last line of the preprint's own proof already yields
+`(7d²+8) log₂ (d+1)`, and the upstream Lean development proves that bound for the number of
+restarts (from the counting inequality as a hypothesis). Both nevertheless keep `(d+1)^6` as
+the constant in the parameters of Section 5 (upstream: `paperWidth N = (N+1)^6`). The point
+made here is that the constant itself can be replaced.
+
+Not formalized: that the rest of Section 5 goes through with the smaller constant. On my
+reading it does, because `D` is used there only as a bound on the size of dissociated sets
+(`|I| < D` in Lemma 5.2, `m < D` in Section 5.4) and in the definition of the grid `η`.
+
 ### Which arity
 
 Arity 4. In the table above it has the smallest exponent of `N` and a smaller power of `r₀`
@@ -265,6 +302,12 @@ formal/SPLP/Local.lean        wealth relative to a node's input wealth (exact ar
 formal/SPLP/Descent.lean      descent without experts: exact labels in 2R queries, margins
 formal/SPLP/Margin.lean       margins, rounded demands, localization; rounding counterexample
 formal/SPLP/LabelTest.lean    the label test: tolerance gives a margin, exact tests are sound
+formal/SPLP/Dissociated.lean  Lemma 5.1 of the preprint with the constant 12 d² ⌈log₂ (d+1)⌉
+formal/SPLP/SubsetSums.lean   subset sums of numbers separated by factors of two are distinct
+formal/SPLP/PolyCount.lean    counting integer polynomials of bounded degree and 1-norm
+formal/SPLP/Norm1.lean        the coefficient 1-norm
+formal/SPLP/Minors.lean       minors as integer polynomials in the matrix entries
+formal/SPLP/CountArith.lean   the counting inequality fails at the smaller constant
 formal/SPLP/Summary.lean      the statements to read
 ```
 
