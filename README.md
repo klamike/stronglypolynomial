@@ -313,10 +313,10 @@ and the polynomial in the exponent drops from degree 48 to degree 24 in `N` (for
 from about `2^202` bits to about `2^129`). The change is three files and 52 lines of diff:
 [upstream-patches/core-width.patch](upstream-patches/core-width.patch), reproducible with
 [upstream-patches/build-core.sh](upstream-patches/build-core.sh) (Lean 4.34.1 and upstream's
-Mathlib revision; the unchanged core is built first as a control). The core is the 53
+Mathlib revision; the unchanged core is built first as a control). The core is the 54
 modules that `MinorAssignments`, `AdaptiveRequests`, `BitBudget` and `Offline` import, and
 needs only Mathlib. Not yet covered: the layers above the core (the machine-model
-implementation and its cost accounting, 768 modules in all), which use the old closed form
+implementation and its cost accounting, 769 modules in all), which use the old closed form
 in about 25 places.
 
 How the upstream Lean development handles this constant (from reading its sources; apart
