@@ -39,6 +39,7 @@ import SPLP.Approx
 import SPLP.ApproxLevel
 import SPLP.GainMarket
 import SPLP.ArityConst
+import SPLP.Returns
 import SPLP.ArgmaxFactor
 import SPLP.PairTest
 import SPLP.DiffConstraints

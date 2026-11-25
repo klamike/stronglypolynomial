@@ -164,6 +164,21 @@ before it:
   comparisons is constant. So the wealth measure is not a pairwise product model, and
   dynamic programming along the comparisons (which would cost `t²` instead of `t^k`) is not
   available; computing the maximum by a chain or a tournament does not change this.
+- **What a child must return** ([formal/SPLP/Returns.lean](formal/SPLP/Returns.lean)). The
+  cells at a node depend on every probe below it because each child hands back each
+  expert's own wealth. Two theorems say how much of that is needed.
+  `scalar_return_cannot_pay`: if a child returned the same multiple `G` of every expert's
+  input, the charge that a failed child must pay could not be met unless
+  `Pm · κ · G ≥ C (ε + λ)`, which for arity 4 means `G > 10⁶`; so returns that forget which
+  experts won do not work in this proof. `price_search_k4_thr_const`: the proof does go
+  through when the update of an expert is anything between
+  `(1 - ep)(1 - c) · w · (1 + η g) · max(1, κ R)` and the exact update, where `R` is the
+  child's multiplier for that expert (`Exec.ValidThr`; every run of the earlier kind is one,
+  `Exec.validThr_of_validWith`). So an expert's individual return matters only when
+  `κ R > 1`, and the experts for which it does hold at most `κ ·` (growth) of the node's
+  input wealth, with `κ ≈ 7 · 10^-6` (`Exec.thr_boosted_mass`). Not a reduction of the cell
+  count: the boosted experts form a union of cells of the child's arrangement, and after
+  boosting they can hold most of the wealth, so they cannot be dropped within the tolerance.
 - **Proposals** (`Consts.exists_vertex_run`, `exists_vertex_min`, `halfInt_of_vertex`,
   `bound_of_vertex`). The potential always has a minimizer that is a vertex (no direction
   preserves all ties between options). With integer demands in `[-R, R]`, every vertex is
@@ -605,6 +620,7 @@ formal/SPLP/Approx.lean       approximately cleared markets: correctness and que
 formal/SPLP/ApproxLevel.lean  the same with a constant tolerance (errors weighted by invested share)
 formal/SPLP/GainMarket.lean   the market condition reduced to the aggregate gain; N-number certificate
 formal/SPLP/ArityConst.lean   constant tolerance and gain condition for arities 3, 5, 6
+formal/SPLP/Returns.lean      what a child must return: scalar returns fail, thresholded returns suffice
 formal/SPLP/ArgmaxFactor.lean the factor of the best option is not a product of pairwise comparisons
 formal/SPLP/PairTest.lean     Lemma 3.1 of the preprint with explicit constants
 formal/SPLP/DiffConstraints.lean  difference constraints: negative-cycle criterion, sign transfer
@@ -616,7 +632,7 @@ formal/SPLP/Compat.lean       lemmas stated locally so the library builds under 
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 12100 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 13100 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
@@ -741,6 +757,13 @@ stated:
      threshold, and for `k = 1` the average log gain is negative.
    - Multiplying per-slot factors would make the wealth a product measure but adds about
      `1.5 · 10^-3` per probe to wealth growth, against about `3 · 10^-9` tolerated.
+   - Truncating a child's return to a fixed depth fails for the same reason as scalar
+     returns. Computing the slot masses from per-slot aggregates fails: after the updates
+     the wealth is a product of sums over which option is best, with no product structure
+     across options (`argmax_factor_const`).
+   - For `k = 2` the sets summed are boxes in the coordinates `(a, a', a - a')`, and trees
+     with lazy multiplicative tags give `O(t)` per operation against `t²`; no polylogarithmic
+     structure for range-multiply with range-sum in two or more dimensions is known to me.
    - Open lead: the wealth evolution is a sequence of range updates on the cells of a tropical
      arrangement, and the sets summed are simplicial cones; partition trees with lazy updates
      might cost `t^(k-1+o(1))` per update or evaluation in place of `t^k` (for arity 4,
