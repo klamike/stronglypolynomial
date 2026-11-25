@@ -342,6 +342,17 @@ as over-estimates, so its running-time polynomials are unchanged by this patch; 
 changes is the bound on the compressed values and hence on the range `R` of the price
 search.
 
+End to end: with the same patch and no further edits, upstream's top-level theorems
+`strongly_polynomial_optimization` and `strongly_polynomial_feasibility` build (1552 modules,
+10781 jobs, no errors or warnings) and depend only on the standard axioms
+([upstream-patches/build-full.sh](upstream-patches/build-full.sh) reproduces this). Two
+quantities in upstream's accounting are defined through the bit formula and therefore
+shrink with it: the range given to the price search, `2^(1 + onlineMinorBitFormula n)`
+(`BitRAM/NativePriceEpoch.lean`), and the query clock of a side decision,
+`subspaceQueryClock n = (n + onlineMinorBitFormula n + 3)^1510`
+(`Geometry/DimensionBounds.lean`). With the bit formula going from degree 48 to degree 24,
+the degree of that clock as a polynomial in `n` halves.
+
 How the upstream Lean development handles this constant (from reading its sources; apart
 from the core just described, nothing in this paragraph is checked by a compiler). Its `paperWidth N =
 (N+1)^6` occurs 88 times in 31 files of `Compression/`. The mathematical core is generic in a
