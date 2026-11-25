@@ -35,4 +35,6 @@ import SPLP.Minors
 import SPLP.Dissociated
 import SPLP.RangeBound
 import SPLP.Approx
+import SPLP.ApproxLevel
+import SPLP.PairTest
 import SPLP.Summary

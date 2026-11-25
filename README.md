@@ -15,11 +15,12 @@ turns sign labels, reliable only at slots of maximum surplus, into prices meetin
 of every consistent hypothesis. Its cost is counted in *probes*: each probe makes one label
 query and one market step (minimize a potential over an implicit pool of experts, then update
 their wealth). `formal/` formalizes that algorithm with all numerical constants as parameters,
-and proves six kinds of statements. The ones to read are in
-[formal/SPLP/Summary.lean](formal/SPLP/Summary.lean) and, for results 4 to 6, in
+and proves seven kinds of statements. The ones to read are in
+[formal/SPLP/Summary.lean](formal/SPLP/Summary.lean) and, for results 4 to 7, in
 [formal/SPLP/Margin.lean](formal/SPLP/Margin.lean),
-[formal/SPLP/LabelTest.lean](formal/SPLP/LabelTest.lean) and
-[formal/SPLP/Dissociated.lean](formal/SPLP/Dissociated.lean).
+[formal/SPLP/LabelTest.lean](formal/SPLP/LabelTest.lean),
+[formal/SPLP/Dissociated.lean](formal/SPLP/Dissociated.lean) and
+[formal/SPLP/PairTest.lean](formal/SPLP/PairTest.lean).
 
 ### 1. Number of probes
 
@@ -112,9 +113,17 @@ before it:
   only the condition at the root changes. For arity 4, with the root making `2 r₀` probes
   and `ζ ≥ 2^-12 / (2N)^46` (depending only on `N`, not on the range or the pool), every
   such run meets all demands and makes at most `4 r₀ (2N)^46` label queries; wealth is still
-  rounded to 41 bits. `ζ = 0` is the exact case. So the weights entering a market step can be
-  rounded to a common grid of relative mesh about `ζ / (number of cells)`, which is
-  logarithmically many bits. Not formalized: a procedure producing such weights (the theorem
+  rounded to 41 bits. `ζ = 0` is the exact case.
+  The tolerance can in fact be a constant (`price_search_k4_approx_const_total`,
+  `Exec.wealth_approx_level`, `growthAt_zero_le_exp`, in
+  [formal/SPLP/ApproxLevel.lean](formal/SPLP/ApproxLevel.lean)): a child node receives only
+  the invested share `c` of the wealth and its output is added back, so the growth factor of
+  a node of height `h + 1` is `((1 - c)(1 + ηζ) + c · G_h)^r`, and for arity 4,
+  `c · r ≈ 0.96 < 1` makes this recursion close. With the same `2 r₀` root probes and the
+  same bound `4 r₀ (2N)^46` on label queries, `ζ = 2^-25` suffices, independent of `N`, of
+  the range and of the pool. So the weights entering a market step need only a constant
+  relative accuracy in total, for instance a common grid of relative mesh
+  `2^-25 / (number of cells)`. Not formalized: a procedure producing such weights (the theorem
   takes any `w'` within the tolerance), and the cell, bit-size and vertex-proposal results
   are still stated for exactly cleared markets only.
 - **Proposals** (`Consts.exists_vertex_run`, `exists_vertex_min`, `halfInt_of_vertex`,
@@ -272,6 +281,32 @@ algorithm:
   Lemmas 5.2 to 5.4.
 - The value of `K` and the count of queries per side decision.
 
+### 7. Lemma 3.1 does not need the preprint's precision (new, first step on `K`)
+
+`log R` is of order `D⁴ K` (result 6), and `K ≈ (N+1) P` where `P ≈ 10⁴ N²` is the precision
+of calibration, fixed in the preprint by `H = 2^(100 N²)`, `ε = H^-10`, `2^-P = H^-100`.
+[formal/SPLP/PairTest.lean](formal/SPLP/PairTest.lean) proves the preprint's Lemma 3.1
+(opposing slots cannot both pass the label test) with explicit constants: for a convex set of
+vectors with entries in `[-ε, 2]` and `Q ≤ q`, at most one slot of each coordinate reaches `θ`
+provided `q < ((θ - ε)/2)² - 2ε(N - 1)` (`opposing_slots`); for `θ = 1/4` it is enough that
+`ε ≤ 1/(400 N)` and `Q ≤ 1/100` (`opposing_slots_quarter`). So this lemma needs a tolerance
+of order `1/N`, not `2^(-1000 N²)`.
+
+Not formalized (a reading of the preprint's Section 4, by an agent, checked by me only in
+outline):
+
+- The proof of Theorem 3 derives coefficient bounds `3^(j-1)` at row `j`, so `H ≥ 3^(r-1)`
+  with `r ≤ 2N` rows would do in place of `2^(100 N²)`, and then `P ≈ log₂ H + 2 log₂ N + 11`,
+  linear in `N`.
+- `K` is defined through `2^K ≥ (N+1) A^(N+1)` because the `N` prices are eliminated from a
+  general linear system. The inequalities being eliminated compare two slots of one cofactor
+  vector and contain two prices with unit coefficients. If they are difference constraints
+  (which holds when both slots lie on the same side), feasibility is the absence of a
+  negative cycle, cycles have at most `N` edges, and `2^K ≥ N · A` suffices, giving
+  `K ≈ P + log₂ P + log₂ N`.
+- Together: `K` from about `10⁴ N³` to about `2N` to `4N`, and `log R` to order
+  `N⁹ log⁴ N`. Later sections of the preprint reuse these constants and were not checked.
+
 ### Which arity
 
 Arity 4. In the table above it has the smallest exponent of `N` and a smaller power of `r₀`
@@ -343,10 +378,12 @@ formal/SPLP/Minors.lean       minors as integer polynomials in the matrix entrie
 formal/SPLP/CountArith.lean   the counting inequality fails at the smaller constant
 formal/SPLP/RangeBound.lean   size of the preprint's demand bound as a function of its constant
 formal/SPLP/Approx.lean       approximately cleared markets: correctness and query bound
+formal/SPLP/ApproxLevel.lean  the same with a constant tolerance (errors weighted by invested share)
+formal/SPLP/PairTest.lean     Lemma 3.1 of the preprint with explicit constants
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 9000 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 9500 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
@@ -452,13 +489,13 @@ stated:
    total for arity 4. A market step whose cost does not grow with the number of completed
    probes (fewer cells, or cells that can be merged or forgotten) would matter more than any
    further constant tuning.
-3. Markets cleared for approximate weights: proved (see "Markets may be cleared
-   approximately"). Open: a formal procedure that produces the approximate weights from the
-   cells, and whether the tolerance must be as small as `1/(2N)^46`. The proof charges the
-   error at every probe of the run at full weight, but a child node only receives the
-   invested share `c` of the wealth, so an error made `l` levels down should count with
-   weight `c^l`. For arity 4, `c · r < 1`, which suggests a tolerance independent of `N`
-   (in progress, not proved).
+3. Markets cleared for approximate weights: proved, with a constant tolerance for arity 4
+   (see "Markets may be cleared approximately"). Open: a formal procedure that produces the
+   approximate weights from the cells; the cell, bit-size and vertex-proposal results for
+   approximately cleared markets; `c · r < 1` for arities 3, 5, 6. Not formalized, and
+   negative: a sparse weighted sample of experts does not work as the approximate weights,
+   since its error on ranges grows by a factor `1 + η(k+1)` per update; only closeness in
+   total variation is stable under the multiplicative updates.
 4. Formalize the two missing pieces of the market step in an explicit cost model: the number
    of evaluations needed to reach a vertex minimizer, and counting the experts of a cell.
 5. Tighten the constants feeding `log R` (`H`, `P`, `K`) with proofs.
