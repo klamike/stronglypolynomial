@@ -1,0 +1,906 @@
+--- a/OAI/Optimization/LinearProgramming/Geometry/DimensionBounds.lean
++++ b/OAI/Optimization/LinearProgramming/Geometry/DimensionBounds.lean
+@@ -39,7 +39,7 @@
+   rw [onlineMinorBitPolynomial_eval, minorCostMagnitude]
+ 
+ /-- Numeric clock evaluated before the first query, independently of coefficient sizes. -/
+-def subspaceQueryClock (n : ℕ) : ℕ := (n + onlineMinorBitFormula n + 3)^1510
++def subspaceQueryClock (n : ℕ) : ℕ := (n + onlineMinorBitFormula n + 3)^989
+ 
+ theorem twice_minorCostMagnitude_size (n : ℕ) : (2 * minorCostMagnitude n).size = onlineMinorBitFormula n + 2 := by
+   rw [minorCostMagnitude, ← pow_succ', Nat.size_pow]
+@@ -54,7 +54,7 @@
+ 
+ /-- A single fixed polynomial bounds physical minor requests for every rational input
+ matrix pair. It counts the minor that triggers each discarded partial price query. -/
+-noncomputable def subspaceMinorCallsPolynomial : Polynomial ℕ := queryCostPolynomial onlineMinorBitPolynomial 1510
++noncomputable def subspaceMinorCallsPolynomial : Polynomial ℕ := queryCostPolynomial onlineMinorBitPolynomial 989
+ 
+ theorem subspaceMinorCalls_bound (r n : ℕ) (hr : r ≤ n) :
+     (minorRestartBudget n + 1) * (subspaceQueryClock n + 1) * (r*n) ≤ subspaceMinorCallsPolynomial.eval n := by
+--- a/OAI/Optimization/LinearProgramming/PriceGame/CampaignRecovery.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/CampaignRecovery.lean
+@@ -17,9 +17,9 @@
+ 
+ set_option exponentiation.threshold 300 in
+ theorem rounds_eq_source_exponent (N R : ℕ) :
+-    rounds N R = (inputSize N R)^(Pool.exceptionExponent + 1 + 74) :=
++    rounds N R = (inputSize N R)^(Pool.exceptionExponent + 1 + 34) :=
+   (rounds_eq N R).trans (congrArg (fun k : ℕ => (inputSize N R)^k)
+-    (show 300 = Pool.exceptionExponent + 1 + 74 by rfl))
++    (show 260 = Pool.exceptionExponent + 1 + 34 by rfl))
+ 
+ 
+ abbrev RootSkeleton (N : ℕ) := SelectedSkeleton (Vertex N 0) 64 (depth N)
+@@ -178,7 +178,7 @@
+   have hXpos : 0 < X := Nat.lt_of_lt_of_le (by decide : 0 < 2) hX
+   have htx := htime.symm.trans (rounds_eq_source_exponent N R)
+   have hTpos : 0 < T :=
+-    (Nat.mul_pos (Nat.pow_pos hXpos (n:=150)) (Nat.pow_pos hXpos (n:=150))).trans_eq htime
++    (Nat.mul_pos (Nat.pow_pos hXpos (n:=130)) (Nat.pow_pos hXpos (n:=130))).trans_eq htime
+   have hm : 1 ≤ M := Nat.one_le_pow _ _ (Nat.mul_pos hXpos hTpos)
+   have hE := Pool.exception_size_power N R X (Nat.zero_lt_of_lt anchor.isLt)
+     (size_facts (R:=R) anchor).2.1 (size_facts (R:=R) anchor).2.2 hX
+@@ -204,7 +204,7 @@
+       apply Real.logb_nonneg (by norm_num)
+       exact_mod_cast (show 1 ≤ 64 * M by omega)
+   have main := vote_at_time (X:=X) (e:=Pool.exceptionExponent) (c:=Pool.catalogueExponent)
+-    (j:=74) (E:=E) (m:=M) h htx hX hm hE le_rfl Pool.trial_exponent_adequate
++    (j:=34) (E:=E) (m:=M) h htx hX hm hE le_rfl Pool.trial_exponent_adequate
+     (fun i => (out i.val).prices) failed tag
+     ((Phases.exceptional_fiber exc).trans_le exc) (fun t ht => succeeds_of_not_failed h _ (by simpa [failed] using ht)) hB
+   exact main
+--- a/OAI/Optimization/LinearProgramming/PriceGame/CampaignRounds.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/CampaignRounds.lean
+@@ -9,15 +9,15 @@
+ 
+ def inputSize (N R : ℕ) : ℕ := N + R.size + 1
+ 
+-/-- Compute the fixed 300th power by squaring the 150th power. -/
+-def rounds (N R : ℕ) : ℕ := (inputSize N R)^150 * (inputSize N R)^150
++/-- Compute the fixed 260th power by squaring the 130th power. -/
++def rounds (N R : ℕ) : ℕ := (inputSize N R)^130 * (inputSize N R)^130
+ 
+ private theorem join_powers (x a b c : ℕ) (h : a+b=c) : x^a * x^b = x^c :=
+   (Nat.pow_add x a b).symm.trans (congrArg (fun k : ℕ => x^k) h)
+ 
+-theorem rounds_eq (N R : ℕ) : rounds N R = (inputSize N R)^300 := by
++theorem rounds_eq (N R : ℕ) : rounds N R = (inputSize N R)^260 := by
+   unfold rounds
+-  exact join_powers (inputSize N R) 150 150 300 rfl
++  exact join_powers (inputSize N R) 130 130 260 rfl
+ 
+ end Campaign
+ end PriceGame
+--- a/OAI/Optimization/LinearProgramming/PriceGame/CampaignWeightCost.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/CampaignWeightCost.lean
+@@ -47,26 +47,26 @@
+     (fun _ _ => 0) _ p.nonnegative hD hd cap (Nat.zero_lt_of_lt anchor.isLt) le_rfl
+ 
+ /-- A single ordinary polynomial in `N + R.size + 1` that bounds every weight encoding
+-when the paper's fixed trial exponent 300 is used. -/
++when the paper's fixed trial exponent 260 is used. -/
+ noncomputable def registerWeightPolynomial : Polynomial ℕ :=
+-  registerPolynomialAt 300 274 probes learningRateBits Pool.catalogueExponent
++  registerPolynomialAt 260 274 probes learningRateBits Pool.catalogueExponent
+ 
+ set_option maxRecDepth 8192 in
+ set_option exponentiation.threshold 1024 in
+-theorem campaignWeightBits_polynomial (N R T : ℕ) (hT : T ≤ (N + R.size + 1)^300) :
++theorem campaignWeightBits_polynomial (N R T : ℕ) (hT : T ≤ (N + R.size + 1)^260) :
+     campaignWeightBits N R T ≤ registerWeightPolynomial.eval (N + R.size + 1) := by
+   let x := N + R.size + 1
+   have hwidth (n : ℕ) : n.size ≤ n := Nat.size_le.mpr n.lt_two_pow_self
+   have hn : N ≤ x := by dsimp [x]; omega
+   have hdepth : depth N ≤ x + 1 := Nat.succ_le_succ ((Nat.log2_le_self N).trans hn)
+-  have hcat : catalogueBits N R T ≤ (x + x^300 + 1) * Pool.catalogueExponent := by
++  have hcat : catalogueBits N R T ≤ (x + x^260 + 1) * Pool.catalogueExponent := by
+     unfold catalogueBits
+     apply Nat.mul_le_mul_right
+     have h1 : (N + R.size + 1).size ≤ x := hwidth _
+     have h2 := (hwidth (T+1)).trans (Nat.succ_le_succ hT)
+-    change (N + R.size + 1).size + (T+1).size ≤ x+x^300+1
+-    change (T+1).size ≤ x^300+1 at h2
+-    exact (Nat.add_le_add h1 h2).trans (le_of_eq (Nat.add_assoc x (x^300) 1).symm)
++    change (N + R.size + 1).size + (T+1).size ≤ x+x^260+1
++    change (T+1).size ≤ x^260+1 at h2
++    exact (Nat.add_le_add h1 h2).trans (le_of_eq (Nat.add_assoc x (x^260) 1).symm)
+   change campaignWeightBits N R T ≤ registerWeightPolynomial.eval x
+   rw [registerWeightPolynomial, eval_registerPolynomialAt]
+   unfold campaignWeightBits weightBits weightLayerBits
+@@ -118,7 +118,7 @@
+ /-- Register theorem usable by a suspended trajectory: an actual prefix supplies the
+ past moment and observation facts, even if no representation of its future is stored. -/
+ theorem prefix_weight_registers_polynomial {N : ℕ} (anchor : Fin N) (R T : ℕ)
+-    (hT : T ≤ (N+R.size+1)^300) (out : ℕ → RoundResult N) (t : ℕ) (ht : t≤T)
++    (hT : T ≤ (N+R.size+1)^260) (out : ℕ → RoundResult N) (t : ℕ) (ht : t≤T)
+     (hs : ∀ j<t, PublicRoundBounds (population R out j) (out j)) :
+     let p := population R out t
+     let D := populationDenominator R out t
+@@ -144,7 +144,7 @@
+ /-- The full recursive register guarantee with a fixed polynomial evaluated at the
+ original dimensions and the binary length of the cost bound. -/
+ theorem actual_round_weight_registers_polynomial {N : ℕ} (anchor : Fin N) (R T : ℕ)
+-    (hT : T ≤ (N + R.size + 1)^300)
++    (hT : T ≤ (N + R.size + 1)^260)
+     (reply : List (Query N × Bool) → Query N → Bool) (history : List (Query N × Bool))
+     (out : ℕ → RoundResult N)
+     (hx : ∀ j : Fin T, out j.val = ((trialLoop (Pool.batch N R)
+--- a/OAI/Optimization/LinearProgramming/PriceGame/Complexity.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/Complexity.lean
+@@ -13,7 +13,7 @@
+ 
+ open States.Mass (depth)
+ 
+-def probes : ℕ := 2 ^ 600 + 1
++def probes : ℕ := 2 ^ 557 + 1
+ 
+ /-- Count every call, including the root and all leaf calls. -/
+ def nodeCount (b : ℕ) : ℕ → ℕ
+@@ -50,13 +50,13 @@
+   omega
+ 
+ theorem trial_nodes_le (n : ℕ) (hn : 0 < n) :
+-    nodeCount (2 * probes) (depth n) ≤ (2 * n) ^ 602 := by
++    nodeCount (2 * probes) (depth n) ≤ (2 * n) ^ 559 := by
+   unfold probes
+-  have hb := branching_pow_le 600 (by omega)
+-  have he : (2:ℕ)^(600+2) = 2^602 :=
+-    congrArg (fun k : ℕ => 2^k) (show (600:ℕ)+2 = 602 by rfl)
++  have hb := branching_pow_le 557 (by omega)
++  have he : (2:ℕ)^(557+2) = 2^559 :=
++    congrArg (fun k : ℕ => 2^k) (show (557:ℕ)+2 = 559 by rfl)
+   exact (nodeCount_le _ _).trans
+-    (const_pow_depth_le n _ 602 hn (hb.trans_eq he))
++    (const_pow_depth_le n _ 559 hn (hb.trans_eq he))
+ 
+ /-- Calls in an actual adaptive trial, including early leaves. -/
+ def calls {E : Type*} {r : ℕ} : Moment.Trial E r → ℕ
+@@ -84,14 +84,14 @@
+         _ = _ := by simp
+ 
+ theorem trial_calls_polynomial {E : Type*} (n : ℕ) (hn : 0 < n)
+-    (tr : Moment.Trial E probes) (hh : tr.height ≤ depth n) : calls tr ≤ (2*n)^602 :=
++    (tr : Moment.Trial E probes) (hh : tr.height ≤ depth n) : calls tr ≤ (2*n)^559 :=
+   (calls_le_nodeCount tr _ hh).trans (trial_nodes_le n hn)
+ 
+ /-- Every nonleaf makes `r` probes, querying at most the number of its coordinates
+ when computing feedback. Each such designated-label procedure uses one root query. -/
+ theorem trial_label_calls_le (n : ℕ) (hn : 0 < n) :
+     nodeCount (2 * probes) (depth n) * probes * (2*n^2) ≤
+-      (2*n)^602 * probes * (2*n^2) :=
++      (2*n)^559 * probes * (2*n^2) :=
+   Nat.mul_le_mul_right _ (Nat.mul_le_mul_right _ (trial_nodes_le n hn))
+ 
+ /-- Bound for the largest baseline on the first `d` levels. -/
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlCampaignArrayBounds.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlCampaignArrayBounds.lean
+@@ -11,7 +11,7 @@
+ 
+ /-- All prepared allocation rows charge their denominators to this same physical local-weight
+ grid, including the incoming values after fixed sharing. -/
+-theorem actual_localGrid_bound {N : ℕ} (anchor : Fin N) (R T : ℕ) (hT : T ≤ (N+R.size+1)^300)
++theorem actual_localGrid_bound {N : ℕ} (anchor : Fin N) (R T : ℕ) (hT : T ≤ (N+R.size+1)^260)
+     (out : ℕ → RoundResult N) (t : ℕ) (ht : t ≤ T)
+     (obs : ∀ j < t, (out j).observations.length ≤ Pool.probeBudget N) :
+     populationDenominator R out t * etaQ.den^probes ≤ 2^(registerWeightPolynomial.eval (N+R.size+1)) := by
+@@ -37,7 +37,7 @@
+ /-- Inputs and physical prepared arrays at every reachable child/prefix of a run started
+ from the actual shared campaign weights. The shape parameters of the envelope are public. -/
+ theorem prefix_trial_array_bounds (env : Control.Wire.Envelope) {N : ℕ} (anchor : Fin N) (R T : ℕ)
+-    (hT : T ≤ (N+R.size+1)^300) (ed : depth N ≤ env.depth) (ev : 2*N^2 ≤ env.vertices)
++    (hT : T ≤ (N+R.size+1)^260) (ed : depth N ≤ env.depth) (ev : 2*N^2 ≤ env.vertices)
+     (ee : ((N+R.size+1)*(T+1))^Pool.catalogueExponent ≤ env.experts)
+     (ep : 2*trialPriceBits N (((N+R.size+1)*(T+1))^Pool.catalogueExponent) R Bits.commonDenominator
+       +4 ≤ env.width)
+@@ -70,7 +70,7 @@
+ 
+ /-- Every history-dependent run satisfies the prefix conditions for these arrays. -/
+ theorem actual_trial_array_bounds (env : Control.Wire.Envelope) {N : ℕ} (anchor : Fin N) (R T : ℕ)
+-    (hT : T ≤ (N+R.size+1)^300) (ed : depth N ≤ env.depth) (ev : 2*N^2 ≤ env.vertices)
++    (hT : T ≤ (N+R.size+1)^260) (ed : depth N ≤ env.depth) (ev : 2*N^2 ≤ env.vertices)
+     (ee : ((N+R.size+1)*(T+1))^Pool.catalogueExponent ≤ env.experts)
+     (ep : 2*trialPriceBits N (((N+R.size+1)*(T+1))^Pool.catalogueExponent) R Bits.commonDenominator
+       +4 ≤ env.width)
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlCampaignNative.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlCampaignNative.lean
+@@ -145,18 +145,18 @@
+ /-- The controller clock is a polynomial in the trial count and dimension and does
+ not inspect the adaptive computation or its unseen branches. -/
+ theorem controlClock_polynomial (T N : ℕ) (hN : 0 < N) :
+-    controlClock N T ≤ T * (5*(2*N)^602 + (2*(N+1))^605) + 1 := by
++    controlClock N T ≤ T * (5*(2*N)^559 + (2*(N+1))^561) + 1 := by
+   have hn := nodeTicks_le_nodeCount (2*Moment.probes) (States.Mass.depth N)
+-  have hcount : Complexity.nodeCount (2*Moment.probes) (States.Mass.depth N) ≤ (2*N)^602 :=
++  have hcount : Complexity.nodeCount (2*Moment.probes) (States.Mass.depth N) ≤ (2*N)^559 :=
+     Complexity.trial_nodes_le N hN
+   have hs := hn.trans (Nat.mul_le_mul_left 5 hcount)
+-  have hroot : Trial.nodeTicks (2*Moment.probes) (States.Mass.depth N) + 2 ≤ 5*(2*N)^602 := by omega
++  have hroot : Trial.nodeTicks (2*Moment.probes) (States.Mass.depth N) + 2 ≤ 5*(2*N)^559 := by omega
+   unfold controlClock
+   calc
+-    _ ≤ T*(5*(2*N)^602) + T*(2*(N+1))^605 + 1 :=
++    _ ≤ T*(5*(2*N)^559) + T*(2*(N+1))^561 + 1 :=
+       Nat.add_le_add_right (Nat.add_le_add (Nat.mul_le_mul_left T hroot)
+         (Nat.mul_le_mul_left T (TrialExecution.queryBound_polynomial N))) 1
+-    _ = _ := by rw [Nat.mul_add T (5*(2*N)^602) ((2*(N+1))^605)]
++    _ = _ := by rw [Nat.mul_add T (5*(2*N)^559) ((2*(N+1))^561)]
+ 
+ theorem emits_length_public {α : Type*} {p : Computation N α} {tr a} (e : Trial.Emits p tr a) :
+     tr.length ≤ p.height := by
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlCampaignWireGuard.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlCampaignWireGuard.lean
+@@ -17,7 +17,7 @@
+ attribute [local irreducible] Moment.probes runRound TrialExecution.runReference
+   TrialExecution.run TrialExecution.execute
+ 
+-private noncomputable def campaignWidthMarks {N : ℕ} (a : Fin N) (R T : ℕ) (hT : T ≤ (N+R.size+1)^300) :
++private noncomputable def campaignWidthMarks {N : ℕ} (a : Fin N) (R T : ℕ) (hT : T ≤ (N+R.size+1)^260) :
+     Driver.CampaignMarks R T a (fun pc => (combinedCode pc).length ≤ combinedPolynomial.eval (inputSize N R)) where
+   HistoryGood := HistoryGood a R T
+   initial := historyGood_start a R T
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlCampaignWirePolynomial.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlCampaignWirePolynomial.lean
+@@ -15,9 +15,9 @@
+ open Learning States.Mass OracleSpec
+ 
+ noncomputable def pricePolynomial : Polynomial ℕ :=
+-  Formula.price 300 Pool.catalogueExponent Bits.commonDenominator.log2
++  Formula.price 260 Pool.catalogueExponent Bits.commonDenominator.log2
+ 
+-noncomputable def queryPolynomial : Polynomial ℕ := Formula.query 300 605
++noncomputable def queryPolynomial : Polynomial ℕ := Formula.query 260 561
+ 
+ /-- Covers the echoed input, the retained replies, and the entire next price packet. -/
+ noncomputable def dialoguePolynomial : Polynomial ℕ := Formula.dialogue queryPolynomial pricePolynomial
+@@ -36,8 +36,8 @@
+     hn he hr hd
+   exact cap.trans_eq (Formula.price_eval time Pool.catalogueExponent Bits.commonDenominator.log2 x).symm
+ 
+-theorem campaignPriceBits_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^300) :
+-    campaignPriceBits N R T ≤ pricePolynomial.eval (N+R.size+1) := priceBits_at N R T 300 hT
++theorem campaignPriceBits_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^260) :
++    campaignPriceBits N R T ≤ pricePolynomial.eval (N+R.size+1) := priceBits_at N R T 260 hT
+ 
+ private theorem queryBound_at (N R T time branches : ℕ) (hT : T ≤ (N+R.size+1)^time)
+     (hq : TrialExecution.queryBound N Moment.probes (depth N) 0 ≤ (2*(N+1))^branches) :
+@@ -48,9 +48,9 @@
+   have h := Formula.query_growth branches hT hq hb
+   exact h.trans_eq (Formula.query_eval time branches x).symm
+ 
+-theorem campaignQueryBound_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^300) :
++theorem campaignQueryBound_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^260) :
+     T * TrialExecution.queryBound N Moment.probes (depth N) 0 ≤ queryPolynomial.eval (N+R.size+1) :=
+-  queryBound_at N R T 300 605 hT (TrialExecution.queryBound_polynomial N)
++  queryBound_at N R T 260 561 hT (TrialExecution.queryBound_polynomial N)
+ 
+ theorem padded_header_budget (i : PublicInput) :
+     (eiPad i).length ≤ 6*(i.goods+i.range.size+1)+4 := by
+@@ -63,7 +63,7 @@
+ /-- Both the physical word budget and the complete number of exchanges are bounded
+ by fixed polynomials, for every answer strategy and every prefix on the padded ABI. -/
+ theorem campaign_session_polynomial (trials : ℕ → ℕ → ℕ) (i : PublicInput)
+-    (hT : trials i.goods i.range ≤ (i.goods+i.range.size+1)^300)
++    (hT : trials i.goods i.range ≤ (i.goods+i.range.size+1)^260)
+     (reply : Transcript → Word → Bool) :
+     let x := i.goods+i.range.size+1
+     ∃ n ≤ queryPolynomial.eval x+1,
+@@ -93,7 +93,7 @@
+         (dialoguePolynomial.eval x) (.inl i) []
+         (wirePlay reply (campaignSolver Campaign.rounds i) []).1
+         (wirePlay reply (campaignSolver Campaign.rounds i) []).2 n := by
+-  have cap := input_cap i.goods i.range (Campaign.rounds i.goods i.range) 300 (Campaign.rounds_eq i.goods i.range)
++  have cap := input_cap i.goods i.range (Campaign.rounds i.goods i.range) 260 (Campaign.rounds_eq i.goods i.range)
+   simpa only [Campaign.inputSize] using campaign_session_polynomial Campaign.rounds i cap reply
+ 
+ end Wire
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlPrepareBudget.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlPrepareBudget.lean
+@@ -29,12 +29,12 @@
+   | succ n =>
+     let v := 2*(n+1)
+     have hv : 2 ≤ v := by dsimp [v]; omega
+-    have hcoef : 2*Moment.probes ≤ (2:ℕ)^602 := by
+-      simpa only [Moment.probes] using double_pow_succ_le 600
++    have hcoef : 2*Moment.probes ≤ (2:ℕ)^559 := by
++      simpa only [Moment.probes] using double_pow_succ_le 557
+     calc
+       scoreBudget (n+1) = (2*Moment.probes)*v^274 := rfl
+-      _ ≤ v^602*v^274 := Nat.mul_le_mul_right _ (hcoef.trans (Nat.pow_le_pow_left hv 602))
+-      _ = v^(602+274) := (pow_add v 602 274).symm
++      _ ≤ v^559*v^274 := Nat.mul_le_mul_right _ (hcoef.trans (Nat.pow_le_pow_left hv 559))
++      _ = v^(559+274) := (pow_add v 559 274).symm
+       _ ≤ v^1024 := Nat.pow_le_pow_right (by omega : 0 < v) (by decide)
+       _ = machineBudget (n+1) := rfl
+ 
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlReplayBound.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlReplayBound.lean
+@@ -23,12 +23,12 @@
+     (fuelWith a b c).eval x = x^a * (5 * (2*x)^b + (2*(x+1))^c) + 1 := by
+   simp only [fuelWith, eval_add, eval_mul, eval_pow, eval_C, eval_X, eval_one]
+ 
+-/-- A fixed degree-905 bound on source control transitions, in the encoded word length. -/
+-noncomputable def fuelPolynomial : Polynomial ℕ := fuelWith 300 602 605
++/-- A fixed degree-821 bound on source control transitions, in the encoded word length. -/
++noncomputable def fuelPolynomial : Polynomial ℕ := fuelWith 260 559 561
+ 
+ theorem fuelPolynomial_eval (x : ℕ) :
+-    fuelPolynomial.eval x = x^300 * (5 * (2*x)^602 + (2*(x+1))^605) + 1 :=
+-  fuelWith_eval 300 602 605 x
++    fuelPolynomial.eval x = x^260 * (5 * (2*x)^559 + (2*(x+1))^561) + 1 :=
++  fuelWith_eval 260 559 561 x
+ 
+ theorem inputSize_le_ecPad (t : Tape) :
+     Campaign.inputSize t.input.goods t.input.range ≤ (ecPad t).length := by
+@@ -54,8 +54,8 @@
+   have hn : t.input.goods ≤ x := by unfold Campaign.inputSize at hs; omega
+   have hn' : 0 < t.input.goods := Nat.zero_lt_of_lt t.input.anchor.isLt
+   refine (Driver.controlClock_polynomial _ _ hn').trans ?_
+-  let cost (T : ℕ) := T * (5*(2*t.input.goods)^602 + (2*(t.input.goods+1))^605) + 1
+-  exact (congrArg cost (Campaign.rounds_eq _ _)).le.trans (input_fuel_le hs hn 300 602 605)
++  let cost (T : ℕ) := T * (5*(2*t.input.goods)^559 + (2*(t.input.goods+1))^561) + 1
++  exact (congrArg cost (Campaign.rounds_eq _ _)).le.trans (input_fuel_le hs hn 260 559 561)
+ 
+ end Replay
+ end Native
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlSign.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlSign.lean
+@@ -24,7 +24,7 @@
+ the bit-machine comparator. -/
+ theorem campaignSolver_queryBound (i : PublicInput) :
+     (campaignSolver Campaign.rounds i).height ≤
+-      2^1510 * (i.goods + (i.range+1).log2 + 1)^1510 := by
++      2^989 * (i.goods + (i.range+1).log2 + 1)^989 := by
+   rw [← Computation.height_toTree, campaignSolver, Computation.toTree_ofTree]
+   exact Campaign.recursive_query_bound_machine i.range i.anchor
+ 
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlTrialCost.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlTrialCost.lean
+@@ -43,7 +43,7 @@
+     (solve : MarketSolver experts) (w : Weights ne) (hw : ∀ i, 0 ≤ w i) {tr out}
+     (e : Emits (run R experts solve w hw) tr out) :
+     nodeTicks (2*Complexity.probes) (depth N) + tr.length ≤
+-      5*(2*N)^602 + (2*(N+1))^605 := by
++      5*(2*N)^559 + (2*(N+1))^561 := by
+   have h1 := ticks_le_node_count (2*Complexity.probes) (depth N)
+   have h2 := Nat.mul_le_mul_left 5 (Complexity.trial_nodes_le N hN)
+   exact Nat.add_le_add (by omega) (e.length_le_height.trans (run_height_polynomial R experts solve w hw))
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlTrialEnvelope.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlTrialEnvelope.lean
+@@ -19,9 +19,9 @@
+   experts := expertCount N R T
+   width := (2*trialPriceBits N (expertCount N R T) R Learning.Bits.commonDenominator+4) + (2*(3+4*Campaign.registerWeightPolynomial.eval (N+R.size+1))+4)
+   score := (2*N)^274
+-  logSize := (2*(N+1))^604
++  logSize := (2*(N+1))^560
+ 
+-def totalTrialTicks (N : ℕ) : ℕ := 5*(2*N)^602+(2*(N+1))^605
++def totalTrialTicks (N : ℕ) : ℕ := 5*(2*N)^559+(2*(N+1))^561
+ 
+ private theorem prefix_log_cap (r k top cap : ℕ) (hk : k ≤ top) (hcap : (6*r+1)^top ≤ cap) :
+     probeLogBound r k ≤ cap :=
+@@ -31,7 +31,7 @@
+ 
+ theorem envelope_log_limit (N R T k : ℕ) (hk : k ≤ depth N) :
+     probeLogBound Moment.probes k ≤ (campaignEnvelope N R T).logSize :=
+-  prefix_log_cap Moment.probes k (depth N) ((2*(N+1))^604) hk (probeBranchPow_le N)
++  prefix_log_cap Moment.probes k (depth N) ((2*(N+1))^560) hk (probeBranchPow_le N)
+ 
+ end Wire
+ end Control
+--- a/OAI/Optimization/LinearProgramming/PriceGame/ControlTrialRoundWidth.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/ControlTrialRoundWidth.lean
+@@ -36,7 +36,7 @@
+   arrays := ⟨fits,registers⟩
+ 
+ private theorem history_root_marks {N : ℕ} (a : Fin N) (R T : ℕ)
+-    (hT : T ≤ (N+R.size+1)^300) (old : ℕ → RoundResult N) (t : ℕ) (ht : t ≤ T)
++    (hT : T ≤ (N+R.size+1)^260) (old : ℕ → RoundResult N) (t : ℕ) (ht : t ≤ T)
+     (sized : ∀ j < t, PublicRoundBounds (population R old j) (old j)) :
+     let p := population R old t
+     let Q := populationDenominator R old t
+@@ -82,7 +82,7 @@
+ 
+ /-- The real native round, started at any public prefix with its own observed population.
+ Its certified length is uniform on every internal program counter, including the final return. -/
+-theorem run_round_guarded_width {N : ℕ} (a : Fin N) (R T : ℕ) (hT : T ≤ (N+R.size+1)^300)
++theorem run_round_guarded_width {N : ℕ} (a : Fin N) (R T : ℕ) (hT : T ≤ (N+R.size+1)^260)
+     (old : ℕ → RoundResult N) (t : ℕ) (ht : t ≤ T)
+     (sized : ∀ j < t, PublicRoundBounds (population R old j) (old j)) (positive : ℕ)
+     {tr round} (actual : Emits (runRound R (Driver.commonMarkets N) (population R old t)) tr round) :
+--- a/OAI/Optimization/LinearProgramming/PriceGame/FixedShareActualAllReplies.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/FixedShareActualAllReplies.lean
+@@ -41,7 +41,7 @@
+ /-- Query count of the full adaptive outer driver. Work performed inside market
+ clearings and on the generated catalogue is accounted for separately. -/
+ theorem strategy_height_explicit {N : ℕ} (R T : ℕ) (anchor : Fin N) (markets : AvailableMarkets N) :
+-    (strategy R T anchor markets).height ≤ T * (2*(N+1))^605 :=
++    (strategy R T anchor markets).height ≤ T * (2*(N+1))^561 :=
+   (strategy_height ..).trans (Nat.mul_le_mul_left T (TrialExecution.queryBound_polynomial N))
+ 
+ /-- The moment and log bounds used in sizing an outer update. Both concern public output data. -/
+--- a/OAI/Optimization/LinearProgramming/PriceGame/FixedShareCombinedWire.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/FixedShareCombinedWire.lean
+@@ -18,7 +18,7 @@
+   goods : ℕ
+   range : ℕ
+   trials : ℕ
+-  cap : trials ≤ (goods+range.size+1)^300
++  cap : trials ≤ (goods+range.size+1)^260
+ 
+ private def argument (i : SizeInput) := i.goods+i.range.size+1
+ 
+@@ -93,7 +93,7 @@
+     ⟨Polynomial.X, fun i => by
+       rw [Polynomial.eval_X]
+       exact (Nat.succ_le_succ (Nat.log2_le_self i.goods)).trans (by unfold argument; omega)⟩
+-  let time := horizonBound 300 SizeInput.cap
++  let time := horizonBound 260 SizeInput.cap
+   let experts := powBound (mulBound x (addBound time (constantBound 1))) Pool.catalogueExponent
+   let prices : Bound (fun i => campaignPriceBits i.goods i.range i.trials) :=
+     ⟨pricePolynomial, fun i => campaignPriceBits_polynomial i.goods i.range i.trials i.cap⟩
+@@ -104,10 +104,10 @@
+   let getWidth := addBound priceWidth (addBound (mulBound (constantBound 2) registerBits) (constantBound 4))
+   let twice := mulBound (constantBound 2) goods
+   let branch := mulBound (constantBound 2) (addBound goods (constantBound 1))
+-  let ticks := addBound (mulBound (constantBound 5) (powBound twice 602)) (powBound branch 605)
++  let ticks := addBound (mulBound (constantBound 5) (powBound twice 559)) (powBound branch 561)
+   exact trialLayoutBound (fun i => campaignEnvelope i.goods i.range i.trials)
+     dep (mulBound (constantBound 2) (powBound goods 2)) experts getWidth
+-    (powBound twice 274) (powBound branch 604) (constantBound (2*Moment.probes)) ticks
++    (powBound twice 274) (powBound branch 560) (constantBound (2*Moment.probes)) ticks
+ 
+ private opaque taggedTrialBound : Bound (fun i => pairBound (cursorWidth i.goods i.range i.trials)
+     ((campaignEnvelope i.goods i.range i.trials).stateSize (2*Moment.probes) (totalTrialTicks i.goods))+1) :=
+@@ -116,19 +116,19 @@
+   addBound (pairSizeBound cursor trialStateBound) (constantBound 1)
+ 
+ private theorem bound_at_input {f : SizeInput → ℕ} (b : Bound f) (N R T : ℕ)
+-    (cap : T ≤ (N+R.size+1)^300) : f ⟨N,R,T,cap⟩ ≤ b.poly.eval (N+R.size+1) :=
++    (cap : T ≤ (N+R.size+1)^260) : f ⟨N,R,T,cap⟩ ≤ b.poly.eval (N+R.size+1) :=
+   b.le ⟨N,R,T,cap⟩
+ 
+ /-- The single polynomial used on both tags of the physical campaign interpreter. -/
+ def combinedPolynomial : Polynomial ℕ := taggedTrialBound.poly
+ 
+-theorem combined_trial_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^300) :
++theorem combined_trial_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^260) :
+     pairBound (cursorWidth N R T) ((campaignEnvelope N R T).stateSize (2*Moment.probes) (totalTrialTicks N))+1 ≤
+       combinedPolynomial.eval (N+R.size+1) := by
+   unfold combinedPolynomial
+   exact bound_at_input taggedTrialBound N R T hT
+ 
+-theorem combined_campaign_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^300) :
++theorem combined_campaign_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^260) :
+     cursorWidth N R T+1 ≤ combinedPolynomial.eval (N+R.size+1) := by
+   have lift (x y : ℕ) : x+1 ≤ pairBound x y+1 := by unfold pairBound; omega
+   exact (lift ..).trans (combined_trial_polynomial N R T hT)
+--- a/OAI/Optimization/LinearProgramming/PriceGame/FixedShareCursorWire.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/FixedShareCursorWire.lean
+@@ -40,7 +40,7 @@
+ 
+ /-- A fixed polynomial bounding every public cursor in the campaign. -/
+ noncomputable def cursorPolynomial : Polynomial ℕ :=
+-  cursorPlan 300 602 Complexity.probes poolWordPolynomial pricePolynomial
++  cursorPlan 260 559 Complexity.probes poolWordPolynomial pricePolynomial
+ 
+ private theorem cursorWidth_le_envelope (N R T x U P W B : ℕ)
+     (hx : N+R.size+1 ≤ x) (hT : T ≤ U) (hp : poolWidth N R T ≤ P)
+@@ -57,12 +57,12 @@
+     c*(2*N)^k ≤ c*(2*x)^k :=
+   Nat.mul_le_mul_left _ (Nat.pow_le_pow_left (Nat.mul_le_mul_left _ h) _)
+ 
+-theorem cursorWidth_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^300) :
++theorem cursorWidth_polynomial (N R T : ℕ) (hT : T ≤ (N+R.size+1)^260) :
+     cursorWidth N R T ≤ cursorPolynomial.eval (N+R.size+1) := by
+   rw [cursorPolynomial, eval_cursorPlan]
+   exact cursorWidth_le_envelope N R T (N+R.size+1) _ _ _ _ le_rfl hT
+     (poolWidth_polynomial N R T hT) (campaignPriceBits_polynomial N R T hT)
+-    (scaledPower_mono Complexity.probes 602 N (N+R.size+1) (by omega))
++    (scaledPower_mono Complexity.probes 559 N (N+R.size+1) (by omega))
+ 
+ /-- After any number of completed rounds, the actual encoded cursor (including its
+ entire probe log) obeys the same fixed polynomial, for arbitrary reply histories. -/
+@@ -72,7 +72,7 @@
+     (hx : ∀ j : Fin T, out j.val =
+       ((trialLoop (Pool.batch N R) (runRound R (fun es => marketSolverAtCommonWeightUnit es))
+         T (Population.start (Pool.batch N R))).run reply history) j)
+-    (hT : T ≤ (N+R.size+1)^300) (t : ℕ) (ht : t ≤ T) :
++    (hT : T ≤ (N+R.size+1)^260) (t : ℕ) (ht : t ≤ T) :
+     (campaignCursorCode (replayCursor a R T out t)).length ≤ cursorPolynomial.eval (N+R.size+1) :=
+   (run_cursor_length a R T reply history out hx t ht).trans (cursorWidth_polynomial N R T hT)
+ 
+--- a/OAI/Optimization/LinearProgramming/PriceGame/FixedSharePopulationWire.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/FixedSharePopulationWire.lean
+@@ -43,7 +43,7 @@
+ 
+ /-- Includes the catalogue, every expert descriptor and raw table, and all the incoming weights. -/
+ noncomputable def poolWordPolynomial : Polynomial ℕ :=
+-  poolEnvelope Polynomial.X (Polynomial.X^300) Pool.catalogueExponent
++  poolEnvelope Polynomial.X (Polynomial.X^260) Pool.catalogueExponent
+ 
+ private theorem eval_poolEnvelope (x t : Polynomial ℕ) (k a : ℕ) :
+     (poolEnvelope x t k).eval a = poolEnvelope (x.eval a) (t.eval a) k := by
+@@ -82,10 +82,10 @@
+     Nat.add_le_add_left (Nat.mul_le_mul_left _ hr) _)
+   exact populationBound_mono hc he hw
+ 
+-theorem poolWidth_polynomial (N R T : ℕ) (hT : T ≤ (N + R.size + 1)^300) :
++theorem poolWidth_polynomial (N R T : ℕ) (hT : T ≤ (N + R.size + 1)^260) :
+     poolWidth N R T ≤ poolWordPolynomial.eval (N + R.size + 1) := by
+   simp only [poolWordPolynomial, eval_poolEnvelope, Polynomial.eval_X, Polynomial.eval_pow]
+-  exact poolWidth_le_envelope N R T (N+R.size+1) ((N+R.size+1)^300) le_rfl hT
++  exact poolWidth_le_envelope N R T (N+R.size+1) ((N+R.size+1)^260) le_rfl hT
+ 
+ /-- A single polynomial in dimension and hidden-cost width bounds the actual
+ binary encoding of each public root state of the unrestricted campaign. -/
+@@ -94,7 +94,7 @@
+     (history : List (Query N × Bool)) (out : ℕ → RoundResult N)
+     (hx : ∀ j : Fin T, out j.val =
+       ((trialLoop (Pool.batch N R) (runRound R markets) T (Population.start (Pool.batch N R))).run reply history) j)
+-    (hT : T ≤ (N + R.size + 1)^300) (t : ℕ) (ht : t ≤ T) :
++    (hT : T ≤ (N + R.size + 1)^260) (t : ℕ) (ht : t ≤ T) :
+     (packedPopulationCode (packPopulation (population R out t))).length ≤
+       poolWordPolynomial.eval (N + R.size + 1) :=
+   (run_population_wire_length anchor R T markets reply history out hx t ht).trans (poolWidth_polynomial N R T hT)
+--- a/OAI/Optimization/LinearProgramming/PriceGame/LearningPolynomial.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/LearningPolynomial.lean
+@@ -69,20 +69,20 @@
+   exact mul_le_power (mul_le_power (skeleton_size_power N X hN hNX hX) (pow_le_power 2 h66)) hmult
+ 
+ /-- One trial contains at most this many probe-price events. -/
+-def probeBudget (N : ℕ) : ℕ := Complexity.probes * (2*N)^602
++def probeBudget (N : ℕ) : ℕ := Complexity.probes * (2*N)^559
+ 
+ private theorem probeBudget_power (N B : ℕ) (hNB : N ≤ B) (hB : 2 ≤ B) :
+-    probeBudget N ≤ B^1805 := by
+-  have hprobes : Complexity.probes ≤ B^601 := by
++    probeBudget N ≤ B^1676 := by
++  have hprobes : Complexity.probes ≤ B^558 := by
+     unfold Complexity.probes
+     rw [Nat.add_comm]
+-    have h := two_pow_succ_le_power hB 600
+-    exact h.trans_eq (congrArg (fun q : ℕ => B^q) (show 600+1=601 by rfl))
+-  have h := mul_le_power hprobes (pow_le_power 602 (mul_le_power (le_first_power hB) (le_first_power hNB)))
+-  exact h.trans_eq (congrArg (fun q : ℕ => B^q) (show 601+(1+1)*602 = 1805 by rfl))
++    have h := two_pow_succ_le_power hB 557
++    exact h.trans_eq (congrArg (fun q : ℕ => B^q) (show 557+1=558 by rfl))
++  have h := mul_le_power hprobes (pow_le_power 559 (mul_le_power (le_first_power hB) (le_first_power hNB)))
++  exact h.trans_eq (congrArg (fun q : ℕ => B^q) (show 558+(1+1)*559 = 1676 by rfl))
+ 
+ /-- Joint fixed degree in the dimension/log-cost parameter and the number of trials. -/
+-def catalogueExponent : ℕ := 1 + (201 + 1821 * 66^2)
++def catalogueExponent : ℕ := 1 + (201 + 1692 * 66^2)
+ 
+ theorem catalogue_size_power (N R X T : ℕ) (hN : 0 < N) (hNX : N ≤ X)
+     (hX : 2 ≤ X) (hT : 0 < T) (hist : ℕ → List (Probe N))
+@@ -100,16 +100,17 @@
+   have ht := le_first_power hTB
+   have h4160 : 4160 ≤ B^13 := const_le_power hB (by decide)
+   have hhist := mul_le_power ht (probeBudget_power N B hNB hB)
+-  have hc : 2 * (T*probeBudget N*4160)+1 ≤ B^1821 := by
++  have hc : 2 * (T*probeBudget N*4160)+1 ≤ B^1692 := by
+     rw [Nat.add_comm]
+     have h := succ_le_power hB (mul_le_power (le_first_power hB) (mul_le_power hhist h4160))
+-    exact h.trans_eq (congrArg (fun q : ℕ => B^q) (show (1+(1+1805+13))+1=1821 by rfl))
++    exact h.trans_eq (congrArg (fun q : ℕ => B^q) (show (1+(1+1676+13))+1=1692 by rfl))
+   exact (catalogue_size N R T _ hist hh).trans
+-    (pool_le_power (B := B) 201 1821 (66^2) ht (skeleton_size_power N B hN hNB hB) hc)
++    (pool_le_power (B := B) 201 1692 (66^2) ht (skeleton_size_power N B hN hNB hB) hc)
+ 
+-/-- A single fixed trial exponent `225+1+74=300` suffices for these catalogue bounds. -/
++/-- A single fixed trial exponent `225+1+34=260` suffices for these catalogue bounds.
++The gap `34` is the least `j` with `4 * (13 + 2 * catalogueExponent * (225 + 1 + j + 1)) < 2^j`. -/
+ theorem trial_exponent_adequate :
+-    4 * (13 + 2 * catalogueExponent * (exceptionExponent + 1 + 74 + 1)) < 2^74 := by
++    4 * (13 + 2 * catalogueExponent * (exceptionExponent + 1 + 34 + 1)) < 2^34 := by
+   norm_num [catalogueExponent, exceptionExponent]
+ 
+ /-- The raw cost bit-width used in `X` is exactly the least binary exponent bounding `R+1`. -/
+--- a/OAI/Optimization/LinearProgramming/PriceGame/MomentConstants.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/MomentConstants.lean
+@@ -14,7 +14,7 @@
+ noncomputable def tau : ℝ := sigma / 8
+ noncomputable def eta : ℝ := sigma / 8
+ noncomputable def scale : ℝ := 2 / sigma
+-def probes : ℕ := 2 ^ 600 + 1
++def probes : ℕ := 2 ^ 557 + 1
+ 
+ theorem sigma_pos : 0 < sigma := by norm_num [sigma]
+ theorem tau_pos : 0 < tau := div_pos sigma_pos (by norm_num)
+@@ -22,13 +22,14 @@
+ theorem scale_pos : 0 < scale := div_pos (by norm_num) sigma_pos
+ private theorem pow_add_one_pos (a n : ℕ) : 0 < a ^ n + 1 := Nat.succ_pos _
+ 
+-theorem probes_pos : 0 < probes := pow_add_one_pos 2 600
++theorem probes_pos : 0 < probes := pow_add_one_pos 2 557
+ theorem probes_odd : Odd probes := by
+-  refine ⟨2 ^ 599, ?_⟩
+-  change 2 ^ 600 + 1 = 2 * 2 ^ 599 + 1
+-  rw [show 600 = 599 + 1 from rfl, pow_succ, Nat.mul_comm (2 ^ 599) 2]
++  refine ⟨2 ^ 556, ?_⟩
++  change 2 ^ 557 + 1 = 2 * 2 ^ 556 + 1
++  rw [show 557 = 556 + 1 from rfl, pow_succ, Nat.mul_comm (2 ^ 556) 2]
+ 
+ private theorem pow272 : (2 : ℝ) ^ 272 = 2 ^ 136 * 2 ^ 136 := pow_add 2 136 136
++private theorem pow274 : (2 : ℝ) ^ 274 = 2 ^ 137 * 2 ^ 137 := pow_add 2 137 137
+ private theorem pow325 : (2 : ℝ) ^ 325 = 2 ^ 162 * 2 ^ 163 := pow_add 2 162 163
+ private theorem pow277 : (2 : ℝ) ^ (277 : ℝ) = (2 : ℝ) ^ 138 * 2 ^ 139 :=
+   (Real.rpow_natCast _ 277).trans (pow_add 2 138 139)
+@@ -38,16 +39,17 @@
+   norm_num [sigma, pow272]
+ 
+ /-- At either exponent used in the trial, the tail paid for rounding is absorbed by
+-the exponential moment at the parent. -/
+-theorem trialBranch_of_large {K : ℝ} (hK : 2 ^ 325 ≤ K) :
++the exponential moment at the parent. The hypothesis is exactly `277 ≤ K * sigma / 4`,
++the only property of `K` (besides `scale ≤ K`) that the argument uses. -/
++theorem trialBranch_of_threshold {K : ℝ} (hK : 277 * 2 ^ 274 ≤ K) :
+     scale ≤ K ∧ 1 + 2 * (2 : ℝ) ^ (-K * sigma / 4) ≤ 2 ^ tau := by
+   constructor
+-  · exact le_trans (by norm_num [scale, sigma, pow325, pow272]) hK
+-  have hprod : (2 : ℝ) ^ 325 * sigma / 4 ≤ K * sigma / 4 := by
++  · exact le_trans (by norm_num [scale, sigma, pow274, pow272]) hK
++  have hprod : 277 * (2 : ℝ) ^ 274 * sigma / 4 ≤ K * sigma / 4 := by
+     exact div_le_div_of_nonneg_right (mul_le_mul_of_nonneg_right hK sigma_pos.le) (by norm_num)
+   have hexp : -K * sigma / 4 ≤ -(277 : ℝ) := by
+-    have hsmall : (277 : ℝ) ≤ 2 ^ 325 * sigma / 4 := by
+-      norm_num [sigma, pow325, pow272]
++    have hsmall : (277 : ℝ) ≤ 277 * 2 ^ 274 * sigma / 4 := by
++      norm_num [sigma, pow274, pow272]
+     rw [neg_mul, neg_div]
+     exact neg_le_neg (hsmall.trans hprod)
+   have hrpow := Real.rpow_le_rpow_of_exponent_le (by norm_num : (1 : ℝ) ≤ 2) hexp
+@@ -65,30 +67,36 @@
+     _ ≤ Real.exp (Real.log 2 * tau) := Real.add_one_le_exp _
+     _ = 2 ^ tau := (Real.rpow_def_of_pos (by norm_num) _).symm
+ 
+-private theorem probes_coe : (probes : ℝ) = (2 : ℝ) ^ 200 * 2 ^ 200 * 2 ^ 200 + 1 := by
++/-- The original threshold `2 ^ 325` is a special case. -/
++theorem trialBranch_of_large {K : ℝ} (hK : 2 ^ 325 ≤ K) :
++    scale ≤ K ∧ 1 + 2 * (2 : ℝ) ^ (-K * sigma / 4) ≤ 2 ^ tau :=
++  trialBranch_of_threshold (le_trans (by norm_num [pow325, pow274]) hK)
++
++private theorem probes_coe : (probes : ℝ) = (2 : ℝ) ^ 200 * 2 ^ 200 * 2 ^ 157 + 1 := by
+   simp only [probes, Nat.cast_add, Nat.cast_pow, Nat.cast_ofNat, Nat.cast_one]
+-  rw [show 600 = (200 + 200) + 200 from rfl, pow_add, pow_add]
++  rw [show 557 = (200 + 200) + 157 from rfl, pow_add, pow_add]
+ 
+ theorem trialBranch_deeper :
+     scale ≤ 2 * probes ∧
+       1 + 2 * (2 : ℝ) ^ (-(2 * probes : ℝ) * sigma / 4) ≤ 2 ^ tau := by
+-  apply trialBranch_of_large
++  apply trialBranch_of_threshold
+   rw [probes_coe]
+-  norm_num [pow325]
++  norm_num [pow274]
+ 
+ theorem trialBranch_local :
+     scale ≤ eta * probes / Real.log 2 ∧
+       1 + 2 * (2 : ℝ) ^ (-(eta * probes / Real.log 2) * sigma / 4) ≤ 2 ^ tau := by
+-  apply trialBranch_of_large
++  apply trialBranch_of_threshold
+   apply (le_div_iff₀ (Real.log_pos (by norm_num : (1 : ℝ) < 2))).2
+-  have hlog : Real.log 2 ≤ 1 := by
+-    exact (Real.log_le_sub_one_of_pos (by norm_num : (0 : ℝ) < 2)).trans (by norm_num)
++  have hlog : Real.log 2 ≤ 9 / 10 := by
++    apply (Real.log_le_iff_le_exp (by norm_num : (0 : ℝ) < 2)).2
++    exact le_trans (by norm_num) (Real.quadratic_le_exp_of_nonneg (by norm_num : (0 : ℝ) ≤ 9 / 10))
+   calc
+-    (2 : ℝ) ^ 325 * Real.log 2 ≤ 2 ^ 325 * 1 :=
++    277 * (2 : ℝ) ^ 274 * Real.log 2 ≤ 277 * 2 ^ 274 * (9 / 10) :=
+       mul_le_mul_of_nonneg_left hlog (by positivity)
+     _ ≤ eta * probes := by
+       rw [probes_coe]
+-      norm_num [eta, sigma, pow325, pow272]
++      norm_num [eta, sigma, pow274, pow272]
+ 
+ end Moment
+ end PriceGame
+--- a/OAI/Optimization/LinearProgramming/PriceGame/OracleTrialCount.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/OracleTrialCount.lean
+@@ -39,8 +39,8 @@
+ 
+ /-- The fixed choice in the Section 7 campaign bound, ready for the outer loop and its
+ serialized counter. -/
+-noncomputable def trialCountUnaryP := sourcePowerUnaryP 300
+-noncomputable def trialCountBinaryP := sourcePowerBinaryP 300
++noncomputable def trialCountUnaryP := sourcePowerUnaryP 260
++noncomputable def trialCountBinaryP := sourcePowerBinaryP 260
+ 
+ end Native
+ end Control
+--- a/OAI/Optimization/LinearProgramming/PriceGame/RecursiveRecovery.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/RecursiveRecovery.lean
+@@ -54,22 +54,39 @@
+       (queries.trans (Nat.pow_le_pow_left upperBound k))
+     _ = _ := by rw [← pow_mul, ← pow_add, deg]
+ 
++/-- Ten doublings of the dimension cost thirteen factors of its successor. The ratio
++`13/10` is within one percent of the best constant `log 6 / log 4`, attained at `N = 3`. -/
++private theorem double_pow_ten_le (N : ℕ) : (2*N)^10 ≤ (N+1)^13 := by
++  rcases Nat.lt_or_ge N 11 with h | h
++  · interval_cases N <;> norm_num
++  · calc
++      (2*N)^10 = 2^10 * N^10 := Nat.mul_pow 2 N 10
++      _ ≤ N^3 * N^10 := Nat.mul_le_mul_right _
++        ((by norm_num : 2^10 ≤ 11^3).trans (Nat.pow_le_pow_left h 3))
++      _ = N^13 := (pow_add N 3 10).symm
++      _ ≤ (N+1)^13 := Nat.pow_le_pow_left (Nat.le_succ N) 13
++
++/-- One trial in the size parameter: `N * (2*N)^560 ≤ x * (x^13)^56`. -/
++private theorem trial_queries_le_size {N x : ℕ} (hN : 0 < N) (hx : N+1 ≤ x) :
++    TrialExecution.queryBound N Moment.probes (depth N) 0 ≤ x^729 := by
++  have block : (2*N)^10 ≤ x^13 := (double_pow_ten_le N).trans (Nat.pow_le_pow_left hx 13)
++  calc
++    _ ≤ N * (2*N)^560 := TrialExecution.queryBound_dimension N hN
++    _ = N * ((2*N)^10)^56 := congrArg (fun q : ℕ => N*q)
++      ((congrArg (fun k : ℕ => (2*N)^k) (show 560 = 10*56 from rfl)).trans (pow_mul (2*N) 10 56))
++    _ ≤ x * (x^13)^56 := Nat.mul_le_mul (Nat.le_of_succ_le hx) (Nat.pow_le_pow_left block 56)
++    _ = x^729 := ((congrArg (fun q : ℕ => x*q) (pow_mul x 13 56).symm).trans
++      (pow_succ' x (13*56)).symm).trans (congrArg (fun k : ℕ => x^k) (show 13*56+1 = 729 from rfl))
++
+ set_option exponentiation.threshold 300 in
+ /-- With the fixed effective trial count, at most a fixed polynomial number of queries
+ are asked even when every reply is inconsistent. -/
+ theorem recursive_query_bound {N : ℕ} (R : ℕ) (anchor : Fin N) :
+-    (referenceStrategy R (rounds N R) anchor).height ≤ (inputSize N R)^1510 := by
+-  have X2 : 2 ≤ inputSize N R := by
+-    have := anchor.isLt
+-    simp only [inputSize]
+-    omega
++    (referenceStrategy R (rounds N R) anchor).height ≤ (inputSize N R)^989 := by
+   have Xn : N+1 ≤ inputSize N R := by simp [inputSize, Nat.add_assoc]
+-  have hbase : 2*(N+1) ≤ (inputSize N R)^2 := by
+-    rw [pow_two]
+-    exact Nat.mul_le_mul X2 Xn
+-  exact combine_query_bounds (x := inputSize N R) (T := rounds N R) 300 2 605 1510
++  exact combine_query_bounds (x := inputSize N R) (T := rounds N R) 260 1 729 989
+     (strategy_height R (rounds N R) anchor (fun xs => TrialExecution.marketSolverAtCommonWeightUnit xs))
+-    (rounds_eq N R) (TrialExecution.queryBound_polynomial N) hbase rfl
++    (rounds_eq N R) (trial_queries_le_size (Nat.zero_lt_of_lt anchor.isLt) Xn) (pow_one _).ge rfl
+ 
+ /-- The ceil logarithm in the manuscript and the floor logarithm in the comparator
+ differ by at most one input bit. -/
+@@ -88,8 +105,8 @@
+ 
+ theorem recursive_query_bound_machine {N : ℕ} (R : ℕ) (anchor : Fin N) :
+     (referenceStrategy R (rounds N R) anchor).height ≤
+-      2^1510 * (N+(R+1).log2+1)^1510 := by
+-  exact substitute_size 1510 (recursive_query_bound R anchor) (inputSize_le_machine N R)
++      2^989 * (N+(R+1).log2+1)^989 := by
++  exact substitute_size 989 (recursive_query_bound R anchor) (inputSize_le_machine N R)
+ 
+ end Campaign
+ end PriceGame
+--- a/OAI/Optimization/LinearProgramming/PriceGame/TrialExecutionComplexity.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/TrialExecutionComplexity.lean
+@@ -40,13 +40,22 @@
+     _ = _ := (pow_succ' _ k).symm
+ 
+ theorem queryBound_polynomial (N : ℕ) :
+-    queryBound N probes (depth N) 0 ≤ (2*(N+1))^605 :=
+-  (queryBound_at_base N probes (depth N) 604 (probeBranchPow_le N)).trans_eq
+-    (congrArg (fun k : ℕ => (2*(N+1))^k) (show 604+1 = 605 from rfl))
++    queryBound N probes (depth N) 0 ≤ (2*(N+1))^561 :=
++  (queryBound_at_base N probes (depth N) 560 (probeBranchPow_le N)).trans_eq
++    (congrArg (fun k : ℕ => (2*(N+1))^k) (show 560+1 = 561 from rfl))
+ 
++/-- The same bound without rounding the dimension up: for a nonempty market the base
++is `2*N`, and the leading factor is the number of goods itself. -/
++theorem queryBound_dimension (N : ℕ) (hN : 0 < N) :
++    queryBound N probes (depth N) 0 ≤ N * (2*N)^560 := by
++  calc
++    _ ≤ N * (6*probes+1)^(depth N) := by
++      simpa only [pow_zero, mul_one] using queryBound_le N probes (depth N) 0
++    _ ≤ _ := Nat.mul_le_mul_left N (Complexity.const_pow_depth_le N _ 560 hN probeBranch_le)
++
+ theorem run_height_polynomial (R : ℕ) (experts : Fin ne → Expert N) (solve : MarketSolver experts)
+     (w : Weights ne) (hw : ∀ e, 0 ≤ w e) :
+-    (run R experts solve w hw).height ≤ (2*(N+1))^605 :=
++    (run R experts solve w hw).height ≤ (2*(N+1))^561 :=
+   (run_height_le ..).trans (queryBound_polynomial N)
+ 
+ private theorem length_flatten_le {α : Type*} (L : List (List α)) (K : ℕ)
+@@ -121,7 +130,7 @@
+ theorem run_log_length_polynomial (R : ℕ) (experts : Fin ne → Expert N) (solve : MarketSolver experts)
+     (w : Weights ne) (hw : ∀ e, 0 ≤ w e)
+     (reply : List (Query N × Bool) → Query N → Bool) (h : List (Query N × Bool)) :
+-    ((run R experts solve w hw).run reply h).val.log.length ≤ (2*(N+1))^604 := by
++    ((run R experts solve w hw).run reply h).val.log.length ≤ (2*(N+1))^560 := by
+   unfold run
+   exact Nat.le_trans (execute_result_log_length probes R experts solve (depth N) 0 .root
+     (fun _ _ => 0) w hw reply h) (probeLogBound_polynomial N)
+@@ -129,7 +138,7 @@
+ theorem run_reaches_log_length {R H : ℕ} {anchor : Fin N} (hidden : Hidden N H anchor)
+     (experts : Fin ne → Expert N) (solve : MarketSolver experts) (w : Weights ne) (hw : ∀ e, 0 ≤ w e)
+     (out : Certified (N:=N) (r:=probes) (l:=0) w) (hr : Computation.Reaches hidden (run R experts solve w hw) out) :
+-    out.val.log.length ≤ (2*(N+1))^604 :=
++    out.val.log.length ≤ (2*(N+1))^560 :=
+   ((execute_log_length probes R experts solve (depth N) 0 .root (fun _ _ => 0) w hw).reaches hidden hr).trans
+     (probeLogBound_polynomial N)
+ 
+@@ -137,7 +146,7 @@
+     probeLogBound probes (depth N) ≤ Learning.Pool.probeBudget N := by
+   have heq : probes = Complexity.probes := rfl
+   rw [heq]
+-  change probeLogBound Complexity.probes (depth N) ≤ Complexity.probes * (2*N)^602
++  change probeLogBound Complexity.probes (depth N) ≤ Complexity.probes * (2*N)^559
+   have hpr : 1 ≤ Complexity.probes := heq ▸ probes_pos
+   have hlast (x : ℕ) : x ≤ Complexity.probes*x := by
+     simpa only [Nat.one_mul] using Nat.mul_le_mul_right x hpr
+--- a/OAI/Optimization/LinearProgramming/PriceGame/TrialExecutionSize.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/TrialExecutionSize.lean
+@@ -132,7 +132,7 @@
+ theorem run_trial_calls_le (R : ℕ) (experts : Fin ne → Expert N)
+     (solve : MarketSolver experts) (w : Weights ne) (hw : ∀ e, 0 ≤ w e) (hN : 0 < N)
+     (reply : List (Query N × Bool) → Query N → Bool) (history : List (Query N × Bool)) :
+-    Complexity.calls ((run R experts solve w hw).run reply history).val.trace ≤ (2 * N)^602 :=
++    Complexity.calls ((run R experts solve w hw).run reply history).val.trace ≤ (2 * N)^559 :=
+   Complexity.trial_calls_polynomial N hN _ (run_trace_height R experts solve w hw reply history)
+ 
+ theorem certified_multiplier_size_le (C B : ℕ) (hC : scaleQ = (C : ℚ)) (hB : C + 2 ≤ 2 ^ B)
+--- a/OAI/Optimization/LinearProgramming/PriceGame/TrialQueryArithmetic.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/TrialQueryArithmetic.lean
+@@ -35,15 +35,20 @@
+     have h := Nat.log2_self_le hN.ne'
+     omega
+ 
+-private theorem six_times_probe_le (n : ℕ) : 6*(2^n+1)+1 ≤ 2^(n+4) := by
++private theorem six_times_probe_le (n : ℕ) (hn : 2 ≤ n) : 6*(2^n+1)+1 ≤ 2^(n+3) := by
+   rw [pow_add]
+-  change 6 * (2 ^ n + 1) + 1 ≤ 2 ^ n * 16
+-  have h : 0 < 2^n := Nat.pow_pos (by decide)
++  change 6 * (2 ^ n + 1) + 1 ≤ 2 ^ n * 8
++  have h : 2^2 ≤ 2^n := Nat.pow_le_pow_right (by decide) hn
+   omega
+ 
+-private theorem six_times_fixed_probe_le (p n : ℕ) (hp : p = 2^n+1) :
+-    6*p+1 ≤ (2 : ℕ)^(n+4) := hp ▸ six_times_probe_le n
++private theorem six_times_fixed_probe_le (p n : ℕ) (hn : 2 ≤ n) (hp : p = 2^n+1) :
++    6*p+1 ≤ (2 : ℕ)^(n+3) := hp ▸ six_times_probe_le n hn
+ 
++/-- The branching base of the query recursion, as a power of two. -/
++theorem probeBranch_le : 6*Moment.probes+1 ≤ 2^560 :=
++  (six_times_fixed_probe_le Moment.probes 557 (by decide) rfl).trans_eq
++    (congrArg (fun d : ℕ => 2^d) (show (557 : ℕ)+3 = 560 from rfl))
++
+ private theorem pow_at_depth_le (N base k : ℕ) (hb : base ≤ 2^k) :
+     base^(States.Mass.depth N) ≤ (2*(N+1))^k := by
+   calc
+@@ -52,13 +57,8 @@
+     _ ≤ _ := Nat.pow_le_pow_left (two_pow_trial_depth_le N) k
+ 
+ theorem probeBranchPow_le (N : ℕ) :
+-    (6*Moment.probes+1)^(States.Mass.depth N) ≤ (2*(N+1))^604 := by
+-  have hbase : 6*Moment.probes+1 ≤ 2^604 := by
+-    have h := six_times_fixed_probe_le Moment.probes 600 rfl
+-    have e : (2 : ℕ) ^ (600 + 4) = 2 ^ 604 :=
+-      congrArg (fun d : ℕ => 2^d) (show (600 : ℕ)+4 = 604 from rfl)
+-    exact h.trans_eq e
+-  exact pow_at_depth_le N (6*Moment.probes+1) 604 hbase
++    (6*Moment.probes+1)^(States.Mass.depth N) ≤ (2*(N+1))^560 :=
++  pow_at_depth_le N (6*Moment.probes+1) 560 probeBranch_le
+ 
+ /-- One probe record per coordinate-price proposal, and no record at a leaf. -/
+ def probeLogBound (r : ℕ) : ℕ → ℕ
+@@ -90,7 +90,7 @@
+       _ = _ := (pow_succ _ _).symm
+ 
+ theorem probeLogBound_polynomial (N : ℕ) :
+-    probeLogBound Moment.probes (States.Mass.depth N) ≤ (2*(N+1))^604 :=
++    probeLogBound Moment.probes (States.Mass.depth N) ≤ (2*(N+1))^560 :=
+   (probeLogBound_le ..).trans (probeBranchPow_le N)
+ 
+ end TrialExecution
+--- a/OAI/Optimization/LinearProgramming/PriceGame/TrialWireBound.lean
++++ b/OAI/Optimization/LinearProgramming/PriceGame/TrialWireBound.lean
+@@ -156,7 +156,7 @@
+     (hw : ∀ e, 0 ≤ w e) (reply : List (Query N × Bool) → Query N → Bool)
+     (history : List (Query N × Bool)) :
+     ((runReference R experts w hw).runMetered (Computation.wireCost Wire.query) reply history).2 ≤
+-      (2*(N+1))^605 * (N*(2*trialPriceBits N ne R D+1)+(N.log2+1)+1) := by
++      (2*(N+1))^561 * (N*(2*trialPriceBits N ne R D+1)+(N.log2+1)+1) := by
+   unfold runReference
+   refine Nat.le_trans ?_ (Nat.mul_le_mul_right _
+     (run_height_polynomial R experts (marketSolverAtCommonWeightUnit experts) w hw))

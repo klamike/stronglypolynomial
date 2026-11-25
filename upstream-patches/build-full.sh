@@ -23,4 +23,7 @@ cd "$OUT"
 lake update HexBareiss HexLLLMathlib
 lake exe cache get
 patch -p1 < "$HERE/full-width.patch"
+# Optional second patch: lower the constants of upstream's price search
+# (query bound x^1510 -> x^989). Applies on top of full-width.patch.
+if [ "${CLOCK:-1}" = 1 ]; then patch -p1 < "$HERE/clock.patch"; fi
 lake build OAI.Optimization.LinearProgramming.Optimization OAI.Optimization.LinearProgramming.Feasibility

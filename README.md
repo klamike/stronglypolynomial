@@ -353,6 +353,31 @@ shrink with it: the range given to the price search, `2^(1 + onlineMinorBitFormu
 (`Geometry/DimensionBounds.lean`). With the bit formula going from degree 48 to degree 24,
 the degree of that clock as a polynomial in `n` halves.
 
+The constants of upstream's price search can also be lowered within its own proofs
+([upstream-patches/clock.patch](upstream-patches/clock.patch), 27 files, applied on top of
+the width patch; trace and list of edits in
+[upstream-patches/CLOCK-REPORT.md](upstream-patches/CLOCK-REPORT.md)). Upstream's formal
+search is not the preprint's with its constants: it uses `2^600 + 1` probes per node and
+`x^300` rounds, `x = N + size R + 1`, and proves at most `x^1510` label queries
+(`recursive_query_bound`). With the patch the top-level theorems still build with standard
+axioms, and:
+
+| Quantity | Upstream | Patched |
+| --- | --- | --- |
+| probes per node | `2^600 + 1` | `2^557 + 1` |
+| per-trial query bound | `(2(N+1))^605` | `(2(N+1))^561` |
+| rounds | `x^300` | `x^260` |
+| `recursive_query_bound` | `x^1510` | `x^989` |
+| `subspaceQueryClock n` | `(n + bits + 3)^1510` | `(n + bits + 3)^989` |
+
+The parameter changes alone give `x^1382`; the rest comes from one added lemma,
+`(2N)^10 ≤ (N+1)^13`, used in place of `2(N+1) ≤ x²` when the per-trial bound is written as
+a power of `x`. What remains is structural: the `557` is forced by upstream's charging
+constant `σ = 2^-272`, and that is the whole gap to the `(2N)^46` proved in `formal/` for
+the same recursion with the constants of result 1. Carrying that sharper analysis into
+upstream's development is not a local change, because its machine-model layer implements
+its own version of the search.
+
 How the upstream Lean development handles this constant (from reading its sources; apart
 from the core just described, nothing in this paragraph is checked by a compiler). Its `paperWidth N =
 (N+1)^6` occurs 88 times in 31 files of `Compression/`. The mathematical core is generic in a
