@@ -15,8 +15,9 @@ turns sign labels, reliable only at slots of maximum surplus, into prices meetin
 of every consistent hypothesis. Its cost is counted in *probes*: each probe makes one label
 query and one market step (minimize a potential over an implicit pool of experts, then update
 their wealth). `formal/` formalizes that algorithm with all numerical constants as parameters,
-and proves two kinds of statements. The ones to read are in
-[formal/SPLP/Summary.lean](formal/SPLP/Summary.lean).
+and proves four kinds of statements. The ones to read are in
+[formal/SPLP/Summary.lean](formal/SPLP/Summary.lean) and, for result 4, in
+[formal/SPLP/Margin.lean](formal/SPLP/Margin.lean).
 
 ### 1. Number of probes
 
@@ -118,6 +119,66 @@ Summing the cell bound over all probes of a run (`total_cells_k*`):
 
 `D` is the depth of the recursion (the least `D` with `(2N)² < (ρ²/β)^D`, logarithmic in `N`).
 
+### 3. The problem is easy in the range of the demands (new)
+
+Not in the preprint: two elementary algorithms with no experts and no markets
+([formal/SPLP/Descent.lean](formal/SPLP/Descent.lean)).
+
+- **Exact labels, `2R` queries** (`lockstep_2R`, `lockstep_meets_demands`). In the model of
+  the preprint's price theorem (integer demands in `[-R, R]`, labels correct only at slots of
+  maximum surplus): start at the origin and move *every* price by `1/2` in the direction of
+  its label. After `2R` queries, and at every later step, the prices meet every demand of
+  every consistent hypothesis. Reason: all prices move in lockstep, so all surpluses stay in
+  one residue class modulo 1; a slot that is not maximal is a full unit below the maximum and
+  cannot overtake it, so the maximum surplus drops by `1/2` per query while it is nonnegative.
+- **Labels with a margin, `n₁ + e₁ - 1` queries** (`descent_meets_demands`,
+  `descent_step_decrease`). If labels are correct at every slot within an additive margin
+  `G` of the maximum surplus (`Hyp.ConsistentAtMargin`; `G = 0` is the preprint's notion,
+  `Hyp.consistentAtMargin_zero`), steps of size `e₁ ≤ G/2` lower the maximum by `e₁` per
+  query: `n₁ ≥ B₀/e₁` coarse steps and `e₁ - 1` unit steps suffice, where `B₀` bounds the
+  initial surplus.
+
+What this says about the complexity: the price problem is trivial when cost may be linear
+in `R`. Everything the recursive market buys, including all the exponents above, is the
+replacement of `R` by `log R`. For linear programming that is the difference between a
+bound depending on the size of the numbers and a strongly polynomial one, so these
+algorithms do not replace the market in general (after compression `R` is exponential in
+`N`). They do replace it whenever `R` is polynomially bounded: `2R` trivial queries against
+`2 r₀ (2N)^46` queries with a market step each.
+
+### 4. Why the range cannot simply be reduced by rounding (new)
+
+Range reduction would be the largest saving available: for a bounded range the number of
+cells is at most the size of the pool, whatever the number of probes. The statements below
+([formal/SPLP/Margin.lean](formal/SPLP/Margin.lean)) are the tools for it, and the exact
+point at which it fails.
+
+- **A margin allows rounded demands** (`consistentAt_of_margin_of_round`,
+  `surplus_le_of_round_meets`). If labels are correct on every slot within `G` of the
+  maximum surplus, they are exact labels for the hypothesis with demands rounded down by up
+  to `G`, at every point. Meeting the rounded demands leaves every true surplus at most `G`.
+- **Exact labels give a margin, at linear cost** (`lockstep_feedback_margin`). After `n`
+  lockstep queries from an integral point `y`, the feedback at `y` is correct on every slot
+  within `n/2` of the maximum surplus at `y`.
+- **A margin costs no more than a price search of that range**
+  (`Hyp.localize_consistentAt`, `Hyp.localize_range`, `Hyp.localize_meets`,
+  `feedback_margin_of_localized`). Lower all demands by `τ ≥ 0` and truncate them to the cube
+  of radius `r` around `y`. If the surpluses at `y` are below `τ + r`, the result is a
+  hypothesis with demands within `r` of `y`, consistent with the original labels after an
+  explicit override outside the cube. Any point meeting it yields feedback at `y` that is
+  correct on every slot of surplus at least `τ`.
+- **With exact labels, rounding is impossible** (`RoundingExample.oracle_consistent`,
+  `RoundingExample.no_common_label`). There are two hypotheses on two coordinates and one
+  label rule on the integer points, consistent with both, whose demands rounded down to
+  integers require opposite labels at the origin. So no procedure that turns labels observed
+  at grid points into labels for the rounded hypothesis is right for both.
+
+What this says: a rounded problem needs labels with a margin as large as the rounding, and a
+margin `G` costs either `2G` exact queries or one price search of range `G`. Scaling
+therefore multiplies the query count by the cost of a full price search at every level, and
+does not give `log R` cheap phases. The cause is that all slots in one rounded level look
+alike at grid points, while an exact label is guaranteed only for the single largest one.
+
 ### Which arity
 
 Arity 4. In the table above it has the smallest exponent of `N` and a smaller power of `r₀`
@@ -178,10 +239,12 @@ formal/SPLP/HalfInt.lean      vertices are half-integral and bounded
 formal/SPLP/VertexRun.lean    runs with vertex proposals
 formal/SPLP/Eval.lean         the potential as a sum over cells
 formal/SPLP/Local.lean        wealth relative to a node's input wealth (exact arithmetic)
+formal/SPLP/Descent.lean      descent without experts: exact labels in 2R queries, margins
+formal/SPLP/Margin.lean       margins, rounded demands, localization; rounding counterexample
 formal/SPLP/Summary.lean      the statements to read
 ```
 
-About 6500 lines. No `sorry`; every headline theorem depends only on `propext`,
+About 7200 lines. No `sorry`; every headline theorem depends only on `propext`,
 `Classical.choice`, `Quot.sound`.
 
 Repository layout:
@@ -248,6 +311,35 @@ Unproved estimates from that search: with the node-relative form above, the numb
 multipliers summed over all probes would have exponent about `46·4 + 4 = 188` for arity 4
 instead of 234; and that correctness only needs a bound on the root's returned wealth, so the
 market could be cleared for approximate weights.
+
+Ideas tried on 25 November 2026 for a structurally cheaper scheme, none formalized unless
+stated:
+
+- *Range reduction by rounding (closed, see result 4).* For small `R` the number of cells is
+  at most the size of the pool, about `N^(k+1) D R^(k+1)`, whatever the number of probes, so
+  `log R` phases of bounded range would replace the exponent 234 by roughly `46 + 5`. It
+  fails for exact labels: rounded demands need a margin as large as the rounding
+  (`RoundingExample`), and a margin `G` costs `2G` queries or a price search of range `G`.
+  Not formalized: variants that keep rank information inside each rounded level (demands
+  `K m + rank`) are consistent at grid points, but their market proposals leave the grid; a
+  market restricted to the grid with finite-difference gains keeps total wealth from growing
+  but then needs feedback correct one grid step below the threshold, which is the same
+  margin again. In the LP reduction the test behind the labels has a margin of a constant
+  factor only (visibility threshold `1/2` or `1/3`); a margin `G` there needs about `G` more
+  bits of precision, so it cannot follow the scale.
+- *Coarse descent.* Lockstep descent with step `e > 1/2` splits the slots into residue
+  classes modulo `2e`; only the class of the maximal slot is protected, and with three or
+  more classes wrong labels can raise the maximum by about `e/3` per query. So step sizes
+  cannot simply be doubled.
+- *Independent per-slot pools* (a product-form market over single guesses, which would need
+  no recursion and only `O(N log R)` queries). Refuted by simulation: labels that always push
+  the non-maximal coordinates away from the box keep it from converging even for `N = 2`.
+- *Reusing one child for many probes, or a chain of reference points instead of a tree.*
+  Feedback against a fixed reference point carries no new information: label information
+  enters the recursion only through ties between a proposal and its child's prices.
+- *Experts thresholded on the current proposal* (pivot at the same level). Makes the market
+  step a fixed-point problem instead of a convex minimization, with no gain in the hit
+  probability for a random pivot.
 
 1. Inside the present analysis the arity-4 probe exponent cannot go below about 45.5
    (numerical optimum of the constraints in `Consts.Good`). The three remaining

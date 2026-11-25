@@ -24,4 +24,6 @@ import SPLP.HalfInt
 import SPLP.VertexRun
 import SPLP.Eval
 import SPLP.Local
+import SPLP.Descent
+import SPLP.Margin
 import SPLP.Summary

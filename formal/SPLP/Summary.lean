@@ -4,6 +4,7 @@ import SPLP.Total
 import SPLP.Cost
 import SPLP.VertexRun
 import SPLP.Eval
+import SPLP.Descent
 
 /-!
 # Summary: the price search with fewer probes
@@ -242,5 +243,33 @@ theorem Consts.exists_vertex_run {k : ℕ} (K : Consts k) (hK : K.Good) (hk : 0 
   refine Exec.ForallProbes.mono ?_ X 0 hist₀ [] (Exec.ForallProbes.and X 0 hist₀ [] h1 h2)
   rintro pre l hist y w ⟨ha, hb⟩ i
   exact ⟨ha i, hb i⟩
+
+omit [Fintype ι] [DecidableEq ι] [Nonempty ι] in
+/-- **The price problem in `2R` queries.** Integer demands in `[-R, R]` and the preprint's
+label oracle (correct only at slots of maximum surplus). Start at the origin and move every
+price by `1/2` in the direction of its label. After `2R` queries, and at every later step, the
+prices meet every demand of every hypothesis consistent with the answers. Compare
+`price_search_k4`: at most `2 r₀ (2N)^46` queries with `r₀` logarithmic in `R`, each with a
+market step. -/
+theorem lockstep_2R (R : ℕ) (H : Hyp ι (Fin (2 * R + 1))) (z : ℕ → ι → Bool)
+    (hcons : ∀ n, H.ConsistentAt (intVal R) (halfRun z (fun _ => 0) n) (z n)) :
+    ∀ n, 2 * R ≤ n → ∀ s ∈ H.S, H.surplus (intVal R) (halfRun z (fun _ => 0) n) s ≤ 0 := by
+  have hint : ∀ v : Fin (2 * R + 1), ∃ m : ℤ, intVal R v = m :=
+    fun v => ⟨(v : ℤ) - R, by simp [intVal]⟩
+  have hI : H.IntAt (intVal R) (fun _ => (0 : ℝ)) :=
+    H.intAt_of_int (intVal R) _ hint (fun _ => ⟨0, by simp⟩)
+  refine lockstep_meets_demands z (fun _ => 0) hI hcons (2 * R) ?_
+  intro s _
+  have hv : intVal R (H.a s) ≤ (R : ℝ) := by
+    have h1 : (((H.a s : Fin (2 * R + 1)) : ℕ) : ℝ) ≤ 2 * R := by
+      have h2 : ((H.a s : Fin (2 * R + 1)) : ℕ) ≤ 2 * R := by have := (H.a s).2; omega
+      exact_mod_cast h2
+    simp only [intVal]
+    linarith
+  have hs : H.surplus (intVal R) (fun _ => (0 : ℝ)) s = intVal R (H.a s) := by
+    simp [Hyp.surplus, sp]
+  rw [hs]
+  push_cast
+  linarith
 
 end SPLP
