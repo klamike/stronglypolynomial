@@ -72,7 +72,7 @@ private theorem norm1_add_le_aux {σ : Type*} (p q : MvPolynomial σ ℤ) :
     norm1_eq_sum_of_subset q (p.support ∪ q.support) Finset.subset_union_right,
     ← Finset.sum_add_distrib]
   refine Finset.sum_le_sum fun m _ => ?_
-  rw [coeff_add]
+  rw [MvPolynomial.coeff_add]
   exact Int.natAbs_add_le _ _
 
 private theorem norm1_sum_le_aux {σ ι : Type*} (s : Finset ι) (F : ι → MvPolynomial σ ℤ) :

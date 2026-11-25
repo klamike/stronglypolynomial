@@ -1,4 +1,5 @@
 import Mathlib
+import SPLP.Compat
 
 /-!
 # Product measures on tuples
@@ -39,7 +40,7 @@ theorem prod_le_pow_mul_prod (m m' : α → ℝ) (ρ : ℝ) (h0 : ∀ s, 0 ≤ m
     (h : ∀ s, m' s ≤ ρ * m s) {k : ℕ} (tup : Fin k → α) :
     ∏ q, m' (tup q) ≤ ρ ^ k * ∏ q, m (tup q) := by
   calc ∏ q, m' (tup q) ≤ ∏ q, (ρ * m (tup q)) :=
-        Finset.prod_le_prod (fun q _ => h0 (tup q)) (fun q _ => h (tup q))
+        prod_le_prod_real _ _ _ (fun q _ => h0 (tup q)) (fun q _ => h (tup q))
     _ = ρ ^ k * ∏ q, m (tup q) := by
         rw [Finset.prod_mul_distrib, Finset.prod_const, Finset.card_univ, Fintype.card_fin]
 

@@ -1,5 +1,6 @@
 import Mathlib
 import SPLP.Norm1
+import SPLP.Compat
 import SPLP.SubsetSums
 import SPLP.PolyCount
 import SPLP.CountArith
@@ -116,7 +117,7 @@ theorem dissociated_count {σ : Type*} [Fintype σ] {I : Type*} [Fintype I] [Dec
             refine Finset.sum_le_sum (fun A _ => ?_)
             refine (norm1_prod_le A _).trans ?_
             calc ∏ u ∈ A, norm1 (q u) ≤ ∏ _u ∈ A, L :=
-                  Finset.prod_le_prod (fun _ _ => Nat.zero_le _) (fun u _ => hnorm u)
+                  prod_le_prod_nat _ _ _ (fun u _ => hnorm u)
               _ = L ^ A.card := by rw [Finset.prod_const]
               _ ≤ L ^ Fintype.card I := Nat.pow_le_pow_right hL (Finset.card_le_univ A)
         _ = T.card * L ^ Fintype.card I := by rw [Finset.sum_const, smul_eq_mul]

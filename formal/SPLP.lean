@@ -1,3 +1,4 @@
+import SPLP.Compat
 import SPLP.Median
 import SPLP.Market
 import SPLP.Boost
