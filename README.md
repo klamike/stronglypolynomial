@@ -1,5 +1,9 @@
 # Lowering the complexity of strongly polynomial LP
 
+Overview of the state of the project, the results and the current directions:
+[klamike.github.io/stronglypolynomial](https://klamike.github.io/stronglypolynomial/)
+(source in [docs/](docs/index.html)).
+
 Working notes. Starting point: *Strongly polynomial linear programming* (OpenAI preprint,
 24 November 2026, [github.com/openai/math](https://github.com/openai/math/tree/main/preprints/Strongly-polynomial-linear-programming-November-24-2026)).
 This repository is self-contained: it holds its own Lean development and none of the upstream
@@ -639,6 +643,7 @@ Repository layout:
 
 ```
 README.md                  results, scope, open directions
+docs/                      the project site (GitHub Pages), one static page
 formal/                    the Lean project (library SPLP)
 scripts/fetch-upstream.sh  sparse checkout of openai/math into src/ (pinned commit)
 src/                       upstream reference checkout; not tracked, nothing in formal/ depends on it

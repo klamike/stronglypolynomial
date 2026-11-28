@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lowering the complexity of strongly polynomial LP</title>
+<meta name="description" content="Machine-checked improvements to the constants and exponents of a claimed strongly polynomial algorithm for linear programming. Status, results, dead ends and current directions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fbfaf6;
+  --surface: #ffffff;
+  --sunken: #f4f2ec;
+  --ink: #1b1b18;
+  --ink-2: #4a4944;
+  --ink-3: #7b7971;
+  --line: #e6e3da;
+  --line-strong: #d3cfc3;
+  --accent: #0e6a5b;
+  --accent-soft: #e2f1ed;
+  --lean-bg: #e2f1ed;  --lean-ink: #0b5548;
+  --comp-bg: #e6ecfa;  --comp-ink: #2a437f;
+  --est-bg: #f7ecd3;   --est-ink: #73500b;
+  --no-bg: #efece6;    --no-ink: #5a5850;
+  --bar: #0e6a5b;
+  --bar-muted: #b9b5a8;
+  --serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --wrap: 1060px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111312;
+    --surface: #181b1a;
+    --sunken: #151716;
+    --ink: #eceae4;
+    --ink-2: #bdbbb3;
+    --ink-3: #8b8982;
+    --line: #272b29;
+    --line-strong: #363b38;
+    --accent: #63cdb7;
+    --accent-soft: #15302b;
+    --lean-bg: #15302b;  --lean-ink: #7fdcc8;
+    --comp-bg: #1a2440;  --comp-ink: #a5bbf2;
+    --est-bg: #33290f;   --est-ink: #e6c475;
+    --no-bg: #242725;    --no-ink: #aeaca4;
+    --bar: #63cdb7;
+    --bar-muted: #4a4f4c;
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16.5px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-color: var(--accent); color: var(--accent); }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+code { background: var(--sunken); border: 1px solid var(--line); border-radius: 5px; padding: 0.08em 0.36em; white-space: nowrap; }
+a code { text-decoration: none; }
+sup { font-size: 0.68em; line-height: 0; vertical-align: 0.55em; }
+sub { font-size: 0.68em; line-height: 0; }
+var { font-family: var(--serif); font-style: italic; font-size: 1.06em; }
+.wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 28px; }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--line); }
+.nav .wrap { display: flex; align-items: center; gap: 28px; height: 54px; }
+.brand { font-family: var(--serif); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap; }
+.brand span { color: var(--accent); }
+.nav nav { display: flex; gap: 22px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+.nav nav::-webkit-scrollbar { display: none; }
+.nav nav a { font-size: 13.5px; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+.nav nav a:hover { color: var(--accent); }
+.nav nav a.gh { color: var(--ink); font-weight: 500; }
+
+/* hero */
+.hero { padding-top: 92px; padding-bottom: 64px; }
+.eyebrow { font-size: 12.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-3); font-weight: 500; margin: 0 0 22px; }
+.eyebrow b { color: var(--accent); font-weight: 600; }
+h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(38px, 6vw, 64px); line-height: 1.04; letter-spacing: -0.022em; margin: 0 0 28px; max-width: 16ch; }
+h1 em { font-style: italic; color: var(--accent); }
+.lede { font-size: clamp(18px, 2.1vw, 21px); line-height: 1.55; color: var(--ink-2); max-width: 62ch; margin: 0 0 18px; }
+.lede strong { color: var(--ink); font-weight: 500; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 500; text-decoration: none; padding: 10px 17px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px 32px; margin: 52px 0 0; padding: 22px 0 0; border-top: 1px solid var(--line); list-style: none; }
+.facts li { font-size: 13.5px; line-height: 1.45; color: var(--ink-3); }
+.facts b { display: block; margin-bottom: 4px; font-family: var(--serif); font-weight: 400; font-size: 26px; line-height: 1.2; color: var(--ink); letter-spacing: -0.01em; }
+
+/* sections */
+section { padding: 72px 0; border-top: 1px solid var(--line); }
+.sec-head { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 40px; max-width: 70ch; }
+.kicker { font-size: 12.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0; }
+h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 3.6vw, 38px); line-height: 1.12; letter-spacing: -0.016em; margin: 0; }
+.sec-head p { color: var(--ink-2); margin: 6px 0 0; }
+h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.005em; margin: 0 0 8px; line-height: 1.35; }
+p { margin: 0 0 14px; }
+.prose { max-width: 70ch; }
+.prose p { color: var(--ink-2); }
+.prose p strong, li strong { color: var(--ink); font-weight: 600; }
+
+/* tags */
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.03em; padding: 3px 9px 3px 7px; border-radius: 999px; white-space: nowrap; vertical-align: 1px; }
+.tag i { font-style: normal; font-family: var(--mono); font-size: 11px; font-weight: 500; }
+.tag.lean { background: var(--lean-bg); color: var(--lean-ink); }
+.tag.comp { background: var(--comp-bg); color: var(--comp-ink); }
+.tag.est  { background: var(--est-bg);  color: var(--est-ink); }
+.tag.no   { background: var(--no-bg);   color: var(--no-ink); }
+.legend { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.legend li { display: grid; grid-template-columns: 148px 1fr; gap: 14px; align-items: baseline; font-size: 14.5px; color: var(--ink-2); }
+
+/* three artifacts */
+.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.trio > div { padding: 26px 26px 24px; border-right: 1px solid var(--line); }
+.trio > div:last-child { border-right: 0; }
+.trio .n { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-bottom: 12px; display: block; }
+.trio p { font-size: 14.5px; color: var(--ink-2); margin: 0; }
+.trio p + p { margin-top: 10px; }
+
+/* headline tiles */
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px 22px; display: flex; flex-direction: column; }
+.tile .what { font-size: 13.5px; color: var(--ink-3); margin: 0 0 16px; min-height: 2.9em; }
+.delta { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 14px; font-family: var(--serif); letter-spacing: -0.01em; }
+.delta .old { font-size: 21px; color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: var(--line-strong); }
+.delta .arr { font-family: var(--sans); font-size: 15px; color: var(--ink-3); }
+.delta .new { font-size: 34px; line-height: 1.1; color: var(--ink); }
+.delta .new.long { font-size: 25px; }
+.tile .note { font-size: 13.5px; color: var(--ink-2); margin: 0 0 16px; line-height: 1.5; }
+.tile .foot { margin-top: auto; }
+
+/* ledger */
+.ledger { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: table; }
+.ledger th, .ledger td { text-align: left; vertical-align: top; padding: 16px 20px; border-bottom: 1px solid var(--line); font-size: 14.5px; }
+.ledger tr:last-child td { border-bottom: 0; }
+.ledger th { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; background: var(--sunken); padding-top: 12px; padding-bottom: 12px; }
+.ledger td:first-child { width: 27%; }
+.ledger td .lvl { display: block; font-weight: 600; color: var(--ink); }
+.ledger td .sub { display: block; font-size: 13px; color: var(--ink-3); margin-top: 3px; }
+.ledger td { color: var(--ink-2); }
+.ledger .indent-1 { padding-left: 34px; }
+.ledger .indent-2 { padding-left: 48px; }
+.ledger .indent-3 { padding-left: 62px; }
+.ledger td.rail { position: relative; }
+.ledger td.rail::before { content: ""; position: absolute; left: 20px; top: 0; bottom: 0; width: 1px; background: var(--line-strong); }
+.table-scroll { overflow-x: auto; border-radius: 14px; }
+.fineprint { font-size: 13.5px; color: var(--ink-3); max-width: 78ch; margin-top: 16px; }
+
+/* results */
+.results { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.result { display: grid; grid-template-columns: 64px minmax(0, 1fr) 300px; gap: 8px 36px; padding: 34px 0; border-bottom: 1px solid var(--line); }
+.result .num { font-family: var(--serif); font-size: 30px; color: var(--ink-3); line-height: 1; padding-top: 2px; }
+.result h3 { font-family: var(--serif); font-weight: 500; font-size: 23px; letter-spacing: -0.01em; margin-bottom: 10px; }
+.result .body p { color: var(--ink-2); font-size: 15.5px; }
+.result .body p:last-child { margin-bottom: 0; }
+.result aside { font-size: 13.5px; color: var(--ink-3); }
+.result aside .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.result aside ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.result aside li a { text-decoration: none; }
+.result aside li a:hover code { border-color: var(--accent); color: var(--accent); }
+.result aside .lbl { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; margin: 0 0 8px; }
+
+/* bars table */
+.bars { width: 100%; border-collapse: collapse; margin: 18px 0 6px; font-size: 14px; }
+.bars th { text-align: left; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; padding: 0 12px 8px 0; border-bottom: 1px solid var(--line); }
+.bars td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
+.bars td.barcell { width: 46%; white-space: normal; }
+.bars .bar { height: 8px; border-radius: 0 4px 4px 0; background: var(--bar-muted); }
+.bars tr.pick .bar { background: var(--bar); }
+.bars tr.pick td { color: var(--ink); font-weight: 500; }
+.bars .val { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* dead ends */
+.dead { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.dead article { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; }
+.dead h3 { margin-bottom: 8px; }
+.dead p { font-size: 14.5px; color: var(--ink-2); margin-bottom: 12px; }
+.dead p:last-child { margin-bottom: 0; }
+
+/* directions */
+.now { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 44px; }
+.now article { border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 4px 4px 14px 14px; background: var(--surface); padding: 20px 24px 22px; }
+.now .state { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+.now .state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.now p { font-size: 14.5px; color: var(--ink-2); margin: 0; }
+.now p + p { margin-top: 10px; }
+.open { counter-reset: o; list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.open li { counter-increment: o; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 0 36px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+.open li::before { content: counter(o, decimal-leading-zero); font-family: var(--mono); font-size: 13px; color: var(--ink-3); padding-top: 3px; }
+.open h3 { margin-bottom: 6px; }
+.open p { color: var(--ink-2); font-size: 15px; margin: 0; max-width: 76ch; }
+
+/* scope + verify */
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+.plain { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.plain li { position: relative; padding-left: 22px; color: var(--ink-2); font-size: 15px; }
+.plain li::before { content: ""; position: absolute; left: 2px; top: 0.72em; width: 8px; height: 1px; background: var(--ink-3); }
+pre { margin: 0 0 14px; background: var(--sunken); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink); }
+pre .c { color: var(--ink-3); }
+.cap { font-size: 13.5px; color: var(--ink-3); margin: 0 0 8px; }
+
+footer { border-top: 1px solid var(--line); padding: 36px 0 60px; font-size: 13.5px; color: var(--ink-3); }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 28px; }
+
+@media (max-width: 940px) {
+  .tiles, .now { grid-template-columns: repeat(2, 1fr); }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trio { grid-template-columns: 1fr; }
+  .trio > div { border-right: 0; border-bottom: 1px solid var(--line); }
+  .trio > div:last-child { border-bottom: 0; }
+  .result { grid-template-columns: 44px minmax(0, 1fr); }
+  .result aside { grid-column: 2; margin-top: 14px; }
+  .two { grid-template-columns: 1fr; gap: 40px; }
+}
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .wrap { padding: 0 20px; }
+  .hero { padding-top: 56px; padding-bottom: 44px; }
+  section { padding: 54px 0; }
+  .tiles, .now, .dead { grid-template-columns: 1fr; }
+  .tile .what { min-height: 0; }
+  .result { grid-template-columns: 1fr; padding: 28px 0; }
+  .result .num { font-size: 20px; }
+  .result aside { grid-column: 1; }
+  .open li { grid-template-columns: 1fr; }
+  .open li::before { margin-bottom: 4px; }
+  .legend li { grid-template-columns: 1fr; gap: 4px; }
+  .nav nav a:not(.gh) { display: none; }
+  .ledger { min-width: 640px; }
+}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">strongly<span>polynomial</span></a>
+    <nav aria-label="Sections">
+      <a href="#glance">At a glance</a>
+      <a href="#cost">Cost ledger</a>
+      <a href="#results">Results</a>
+      <a href="#dead-ends">Dead ends</a>
+      <a href="#directions">Directions</a>
+      <a href="#verify">Verify</a>
+      <a class="gh" href="https://github.com/klamike/stronglypolynomial">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<div class="wrap hero">
+  <p class="eyebrow">Working notes · status as of <b>28 November 2026</b></p>
+  <h1>How low can the polynomial <em>go?</em></h1>
+  <p class="lede">On 24 November 2026 an OpenAI preprint announced a <strong>strongly polynomial algorithm for linear programming</strong>, with a Lean development behind it. Its running time is a polynomial of very high degree. This project works on lowering that degree.</p>
+  <p class="lede">One rule: <strong>an argument counts only if it is formalized in Lean.</strong> Everything else on this page is labelled as an estimate.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/klamike/stronglypolynomial">Repository</a>
+    <a class="btn" href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Summary.lean">Statements to read</a>
+    <a class="btn" href="https://github.com/openai/math/tree/main/preprints/Strongly-polynomial-linear-programming-November-24-2026">The preprint ↗</a>
+  </div>
+  <ul class="facts">
+    <li><b>51</b> Lean files, about 13,100 lines</li>
+    <li><b>0</b> uses of <span class="mono">sorry</span></li>
+    <li><b>3</b> axioms: <span class="mono">propext</span>, <span class="mono">Classical.choice</span>, <span class="mono">Quot.sound</span></li>
+    <li><b>3</b> patches compiled through upstream's top-level theorems</li>
+  </ul>
+</div>
+
+<section id="objects">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Orientation</p>
+      <h2>Three objects, and which one each result is about</h2>
+      <p>The preprint's text and its Lean development are not the same algorithm with the same constants, so every number on this page says which of them it refers to.</p>
+    </div>
+    <div class="trio">
+      <div>
+        <span class="n">01 · the preprint</span>
+        <h3>The text</h3>
+        <p>Reduces LP to <em>side decisions</em>, and each side decision to a search for prices from sign labels (its Theorem 2). Labels come from a feasibility test; the numbers involved are shortened by an online Frank–Tardos style compression.</p>
+        <p>Stated cost of the price search: about <var>N</var><sup>60</sup> log(<var>NR</var>) label queries.</p>
+      </div>
+      <div>
+        <span class="n">02 · upstream Lean</span>
+        <h3>OpenAI's formalization</h3>
+        <p>Proves the end-to-end theorem on a machine model. It formalizes its own, cruder variant of the search, with much larger constants: 2<sup>600</sup>+1 probes per node and a query bound <var>x</var><sup>1510</sup>.</p>
+        <p>This project builds it locally and changes it only through patches that still compile to its top-level theorems.</p>
+      </div>
+      <div>
+        <span class="n">03 · this repository</span>
+        <h3>The <span class="mono">SPLP</span> library</h3>
+        <p>An independent Lean formalization of the preprint's price search with every numerical constant as a parameter, plus the parts of the label test, calibration and compression needed to shrink their constants.</p>
+        <p>Self-contained: it depends on Mathlib only.</p>
+      </div>
+    </div>
+
+    <div class="prose" style="margin-top:44px">
+      <h3>How to read the labels</h3>
+    </div>
+    <ul class="legend" style="margin-top:14px; max-width: 78ch">
+      <li><span><span class="tag lean"><i>✓</i> Lean theorem</span></span><span>Proved in this repository's library. No <span class="mono">sorry</span>, standard axioms only.</span></li>
+      <li><span><span class="tag comp"><i>⚙</i> Compiled patch</span></span><span>A patch to upstream's Lean development, after which its top-level theorems <span class="mono">strongly_polynomial_optimization</span> and <span class="mono">strongly_polynomial_feasibility</span> still build with standard axioms.</span></li>
+      <li><span><span class="tag est"><i>~</i> Not formalized</span></span><span>An estimate, a simulation or a reading of the text. Not checked by a compiler and not to be relied on.</span></li>
+      <li><span><span class="tag no"><i>✕</i> Ruled out</span></span><span>An idea that fails, with a counterexample theorem where one exists.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section id="glance">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">At a glance</p>
+      <h2>What has moved so far</h2>
+    </div>
+    <div class="tiles">
+      <div class="tile">
+        <p class="what">Label queries of the price search (preprint's Theorem 2), exponent of <var>N</var></p>
+        <div class="delta"><span class="old">≈ 60</span><span class="arr">→</span><span class="new">46</span></div>
+        <p class="note">At most 2<var>r</var><sub>0</sub>(2<var>N</var>)<sup>46</sup> queries for experts of arity 4, and (2<var>N</var>)<sup>35</sup> for arity 6. The 60 is the preprint's own stated figure.</p>
+        <div class="foot"><span class="tag lean"><i>✓</i> Lean theorem</span></div>
+      </div>
+      <div class="tile">
+        <p class="what">Upstream's formal query bound <var>x</var><sup><var>e</var></sup>, with <var>x</var> = <var>N</var> + size <var>R</var> + 1</p>
+        <div class="delta"><span class="old">1510</span><span class="arr">→</span><span class="new">989</span></div>
+        <p class="note">By re-choosing parameters inside upstream's own proofs. Probes per node go from 2<sup>600</sup>+1 to 2<sup>557</sup>+1.</p>
+        <div class="foot"><span class="tag comp"><i>⚙</i> Compiled patch</span></div>
+      </div>
+      <div class="tile">
+        <p class="what">Degree in <var>N</var> of upstream's bound on the bit length of compressed values (this fixes log <var>R</var>)</p>
+        <div class="delta"><span class="old">48</span><span class="arr">→</span><span class="new">24</span></div>
+        <p class="note">The compression width (<var>N</var>+1)<sup>6</sup> is replaced by (7<var>N</var>²+8)<var>N</var>+1. A width of order <var>N</var>² log <var>N</var> compiles for the mathematical core only.</p>
+        <div class="foot"><span class="tag comp"><i>⚙</i> Compiled patch</span></div>
+      </div>
+      <div class="tile">
+        <p class="what">Upstream's precision radius (bits to which logarithms of minors are compared)</p>
+        <div class="delta"><span class="old">100(<var>N</var>+1)³</span><span class="arr">→</span><span class="new long">6<var>N</var>+16</span></div>
+        <p class="note">A constant factor of about 18 in the bit count, not a change of degree.</p>
+        <div class="foot"><span class="tag comp"><i>⚙</i> Compiled patch</span></div>
+      </div>
+      <div class="tile">
+        <p class="what">Accuracy the market step needs, as a share of total wealth</p>
+        <div class="delta"><span class="old">exact</span><span class="arr">→</span><span class="new">2<sup>−25</sup></span></div>
+        <p class="note">A proposal is admissible if the aggregate gain against it is at most 2<sup>−25</sup> of the wealth. Independent of <var>N</var>, the range and the pool; no potential has to be minimized.</p>
+        <div class="foot"><span class="tag lean"><i>✓</i> Lean theorem</span></div>
+      </div>
+      <div class="tile">
+        <p class="what">Bound on dissociated sets of minors (preprint's Lemma 5.1), <var>d</var> = matrix size</p>
+        <div class="delta"><span class="old">(<var>d</var>+1)<sup>6</sup></span><span class="arr">→</span><span class="new long">12<var>d</var>²⌈log<sub>2</sub>(<var>d</var>+1)⌉</span></div>
+        <p class="note">The bound is implicit in the preprint's own proof; what is new is using it as the constant that fixes the range <var>R</var>.</p>
+        <div class="foot"><span class="tag lean"><i>✓</i> Lean theorem</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="cost">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Cost ledger</p>
+      <h2>Where the running time comes from</h2>
+      <p>The algorithm is a nest of loops. Each row multiplies the one above it. The table says what the preprint has at each level, what is established here, and how firmly.</p>
+    </div>
+    <div class="table-scroll">
+    <table class="ledger">
+      <thead><tr><th>Level</th><th>Preprint</th><th>Here</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="lvl">Linear program</span><span class="sub">primal–dual reduction, witness recovery</span></td>
+          <td>About <var>N</var> side decisions per recovered witness.</td>
+          <td>Not touched.</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td class="rail indent-1"><span class="lvl">Restarts per side decision</span><span class="sub">compression, Section 5</span></td>
+          <td>Fewer than <var>D</var> = (<var>d</var>+1)<sup>6</sup>; its proof gives (7<var>d</var>²+8) log<sub>2</sub>(<var>d</var>+1), which upstream already uses for restarts.</td>
+          <td>Lemma 5.1 formalized with 12<var>d</var>²⌈log<sub>2</sub>(<var>d</var>+1)⌉.</td>
+          <td><span class="tag lean"><i>✓</i> Lean theorem</span></td>
+        </tr>
+        <tr>
+          <td class="rail indent-1"><span class="lvl">Range of the demands, log <var>R</var></span><span class="sub">set by compression and precision, Sections 4–5</span></td>
+          <td>Order <var>D</var><sup>4</sup><var>K</var>, about <var>N</var><sup>27</sup> with its constants. Upstream's formula: about 80(<var>N</var>+1)<sup>48</sup>.</td>
+          <td>Upstream's formula lowered to degree 24. For the text: order <var>N</var><sup>11</sup> log<sup>4</sup><var>N</var> with the smaller <var>D</var>, and <var>N</var><sup>9</sup> log<sup>4</sup><var>N</var> if the precision results carry through.</td>
+          <td><span class="tag comp"><i>⚙</i> Compiled patch</span><br><span class="tag est" style="margin-top:6px"><i>~</i> Not formalized</span></td>
+        </tr>
+        <tr>
+          <td class="rail indent-2"><span class="lvl">Probes per price search</span><span class="sub">Theorem 2, recursive market</span></td>
+          <td>About <var>N</var><sup>60</sup> log(<var>NR</var>).</td>
+          <td>At most 2<var>r</var><sub>0</sub>(2<var>N</var>)<sup>46</sup>, with <var>r</var><sub>0</sub> logarithmic in the pool, hence <var>O</var>(<var>N</var><sup>46</sup> log(<var>NR</var>)).</td>
+          <td><span class="tag lean"><i>✓</i> Lean theorem</span></td>
+        </tr>
+        <tr>
+          <td class="rail indent-3"><span class="lvl">Label query per probe</span><span class="sub">feasibility test, Section 3</span></td>
+          <td>Run at a precision of <var>P</var> ≈ 10<sup>4</sup><var>N</var>² bits.</td>
+          <td>The test is sound at precision about 1.6<var>r</var> + 2 log<sub>2</sub><var>N</var>, linear in <var>N</var>. That calibration produces rows of the assumed form is a reading.</td>
+          <td><span class="tag lean"><i>✓</i> Lean theorem</span><br><span class="tag est" style="margin-top:6px"><i>~</i> Not formalized</span></td>
+        </tr>
+        <tr>
+          <td class="rail indent-3"><span class="lvl">Market step per probe</span><span class="sub">minimize a potential over an exponential pool of experts</span></td>
+          <td>The number of cells of experts "remains polynomial".</td>
+          <td>At most (2<var>N</var>)<sup><var>k</var></sup>(2<var>ND</var>+1) · <var>O</var>(<var>t</var><sup><var>k</var></sup>) cells after <var>t</var> probes for arity <var>k</var>; summed over a run, (2<var>N</var>)<sup>234</sup> for arity 4. <strong>This is the dominant cost and the main open problem.</strong></td>
+          <td><span class="tag lean"><i>✓</i> Lean theorem</span></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="fineprint">There is no end-to-end exponent for LP here. The rows are proved or estimated separately, in different models, and are not multiplied together by any theorem. In particular the cell bound counts what a market step has to handle, not the running time of an implementation.</p>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Results</p>
+      <h2>Eight results, in the order they were found</h2>
+      <p>Each links to the Lean file that states it. The <a href="https://github.com/klamike/stronglypolynomial#readme">README</a> has the full statements and every caveat.</p>
+    </div>
+
+    <div class="results">
+
+      <div class="result">
+        <div class="num">1</div>
+        <div class="body">
+          <h3>The price search needs (2<var>N</var>)<sup>46</sup> label queries, not <var>N</var><sup>60</sup></h3>
+          <p>The algorithm is the preprint's: the same experts, markets, feedback rule and recursion. The saving comes from the accounting. Gains and losses are kept as exact logarithms, reserve masses follow a free geometric sequence, the bonus per failed probe is chosen so that its inequality is tight, and the constants are re-optimized. Checking a new set of constants is one <span class="mono">norm_num</span> call.</p>
+          <table class="bars" aria-label="Exponent of 2N in the label-query bound, by expert arity">
+            <thead><tr><th>Expert arity</th><th>Probes per node</th><th class="val">Exponent</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>preprint, 4</td><td>524,289</td><td class="val">≈ 60</td><td class="barcell"><div class="bar" style="width:90.9%"></div></td></tr>
+              <tr><td>3</td><td>121,100</td><td class="val">66</td><td class="barcell"><div class="bar" style="width:100%"></div></td></tr>
+              <tr class="pick"><td>4 (kept)</td><td>125,800</td><td class="val">46</td><td class="barcell"><div class="bar" style="width:69.7%"></div></td></tr>
+              <tr><td>5</td><td>213,700</td><td class="val">39</td><td class="barcell"><div class="bar" style="width:59.1%"></div></td></tr>
+              <tr><td>6</td><td>1,352,300</td><td class="val">35</td><td class="barcell"><div class="bar" style="width:53%"></div></td></tr>
+            </tbody>
+          </table>
+          <p>Arity 4 is kept even though higher arities need fewer queries, because the market step gets more expensive with the arity (result 2). Within this analysis the arity-4 exponent cannot go below about 45.5.</p>
+        </div>
+        <aside>
+          <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span></div>
+          <ul>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Summary.lean"><code>price_search_k4_total</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Final.lean"><code>Consts.price_search</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Instances.lean"><code>K4_good</code></a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="result">
+        <div class="num">2</div>
+        <div class="body">
+          <h3>What a market step has to handle</h3>
+          <p>The pool of experts is exponentially large, so a market step can only work on aggregates. After <var>t</var> probes the experts of one group fall into at most <var>O</var>(<var>t</var><sup><var>k</var></sup>) cells with common wealth and common best options, because each probe cuts ℝ<sup><var>k</var></sup> by a fixed number of hyperplanes. The product of the preprint's interval partitions would give degree 15 in <var>t</var> for arity 4, against degree 4.</p>
+          <p>Three changes to the algorithm are proved correct with the same query bounds. <strong>Wealth can be rounded</strong> to 41 significant bits, where exact wealth grows by about 21 bits per probe. <strong>Markets can be cleared approximately</strong>, with a tolerance that is a constant. And <strong>only the aggregate gain matters</strong>: a proposal is certified by <var>N</var> signed slot masses whose absolute values sum to at most 2<sup>−25</sup> of the wealth.</p>
+        </div>
+        <aside>
+          <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span></div>
+          <ul>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Cost.lean"><code>probe_cost</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Bits.lean"><code>Exec.wealth_float</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/ApproxLevel.lean"><code>price_search_k4_approx_const_total</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/GainMarket.lean"><code>gainMarket_of_selection</code></a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="result">
+        <div class="num">3</div>
+        <div class="body">
+          <h3>The whole market buys exactly one thing: <var>R</var> → log <var>R</var></h3>
+          <p>In the preprint's model, with integer demands in [−<var>R</var>, <var>R</var>], a trivial algorithm works: move every price by ½ in the direction of its label. After 2<var>R</var> queries every demand of every consistent hypothesis is met. No experts and no markets.</p>
+          <p>So the price problem is easy when cost may be linear in <var>R</var>, and everything the recursive market achieves is the replacement of <var>R</var> by log <var>R</var>. For LP that is the difference between polynomial and strongly polynomial, since <var>R</var> is exponential in <var>N</var> after compression.</p>
+        </div>
+        <aside>
+          <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span></div>
+          <ul>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Summary.lean"><code>lockstep_2R</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Descent.lean"><code>descent_meets_demands</code></a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="result">
+        <div class="num">4</div>
+        <div class="body">
+          <h3>The range cannot be reduced by rounding</h3>
+          <p>Scaling would be the largest saving available: solve a coarse problem, then refine. It fails. A rounded problem needs labels that are correct within a margin as large as the rounding, and a margin <var>G</var> costs either 2<var>G</var> queries or a full price search of range <var>G</var>.</p>
+          <p>With exact labels it is impossible outright: there are two hypotheses and one label rule consistent with both, whose rounded demands need opposite labels at the same point.</p>
+        </div>
+        <aside>
+          <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span><span class="tag no"><i>✕</i> Ruled out</span></div>
+          <ul>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Margin.lean"><code>RoundingExample.no_common_label</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Margin.lean"><code>consistentAt_of_margin_of_round</code></a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="result">
+        <div class="num">5</div>
+        <div class="body">
+          <h3>The label test is more reliable than the search assumes</h3>
+          <p>The search only assumes that labels are right at slots of maximum surplus. The test that produces them does better: if it passes at a coordinate, every true witness is invisible there by a factor (<var>N</var>−1)<var>ε</var>/<var>θ</var>, so labels are right within a margin that grows linearly with the bits of precision. With zero tolerance the test is never wrong.</p>
+          <p>Whether that margin survives calibration and compression has not been checked, and by results 3 and 4 a margin does not lower the exponent.</p>
+        </div>
+        <aside>
+          <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span></div>
+          <ul>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/LabelTest.lean"><code>falsePositive_bound_max</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/LabelTest.lean"><code>exact_test_sound</code></a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="result">
+        <div class="num">6</div>
+        <div class="body">
+          <h3>The compression constant, here and in upstream's development</h3>
+          <p>The range <var>R</var> is not a property of the linear program. It is the size of the short substitutes that Section 5 computes for logarithms of minors, and it is governed by one constant <var>D</var>, a bound on dissociated sets of minors. The preprint fixes <var>D</var> = (<var>d</var>+1)<sup>6</sup>. Lemma 5.1 is formalized here with 12<var>d</var>²⌈log<sub>2</sub>(<var>d</var>+1)⌉, and log <var>R</var> is shown to be of order <var>D</var><sup>4</sup><var>K</var> for the preprint's formulas.</p>
+          <p>The same change is carried into upstream's Lean development by three patches, applied in order (width, search constants, precision radius). After all of them its two top-level theorems build (1,552 modules) with standard axioms.</p>
+          <table class="bars" aria-label="Quantities in upstream's development before and after the patches">
+            <thead><tr><th>Quantity in upstream</th><th>Before</th><th>After</th></tr></thead>
+            <tbody>
+              <tr><td>Compression width</td><td>(<var>N</var>+1)<sup>6</sup></td><td>(7<var>N</var>²+8)<var>N</var>+1</td></tr>
+              <tr><td>Bit formula, degree in <var>N</var></td><td>48</td><td>24</td></tr>
+              <tr><td>Probes per node</td><td>2<sup>600</sup>+1</td><td>2<sup>557</sup>+1</td></tr>
+              <tr><td>Query bound</td><td><var>x</var><sup>1510</sup></td><td><var>x</var><sup>989</sup></td></tr>
+              <tr><td>Precision radius</td><td>100(<var>N</var>+1)³</td><td>6<var>N</var>+16</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <aside>
+          <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span><span class="tag comp"><i>⚙</i> Compiled patch</span></div>
+          <ul>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Dissociated.lean"><code>minors_dissociated_card_lt</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/RangeBound.lean"><code>cF_le</code>, <code>le_cF</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/upstream-patches/WIDTH-REPORT.md">Width report</a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/upstream-patches/CLOCK-REPORT.md">Clock report</a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/upstream-patches/RADIUS-REPORT.md">Radius report</a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="result">
+        <div class="num">7</div>
+        <div class="body">
+          <h3>The precision constants can be much smaller</h3>
+          <p>The preprint sets its precision through <var>H</var> = 2<sup>100<var>N</var>²</sup>. Its own proof of Theorem 3 derives a coefficient bound 3<sup><var>j</var>−1</sup> and then relaxes it. Formalized here: the bound 3<sup><var>j</var></sup> for rows of the form calibration produces, Lemma 3.1 with a tolerance of order 1/<var>N</var> in place of 2<sup>−1000<var>N</var>²</sup>, and soundness of the label test at a precision linear in <var>N</var>.</p>
+          <p>A second factor of <var>N</var> would come from the observation that the inequalities of Section 4.3 are difference constraints. The criterion for difference constraints and the one-sidedness of cofactor vectors are proved. That Section 4.3 has exactly this form is still a reading of the text.</p>
+        </div>
+        <aside>
+          <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span><span class="tag est"><i>~</i> Not formalized</span></div>
+          <ul>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Precision.lean"><code>label_test_sound</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/PairTest.lean"><code>opposing_slots_quarter</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/DiffConstraints.lean"><code>diff_feasible_iff</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/BlockMinors.lean"><code>block_minors_one_sided</code></a></li>
+          </ul>
+        </aside>
+      </div>
+
+      <div class="result">
+        <div class="num">8</div>
+        <div class="body">
+          <h3>One short strategy, in upstream's own query model</h3>
+          <p>Results 1 and 2 say that every valid run is correct and short. Here the search becomes a single adaptive strategy: a tree whose next query depends only on the answers so far. For upstream's unchanged definition of the price game there is one tree, correct for every hidden instance, of height at most</p>
+          <p style="font-family: var(--serif); font-size: 19px; color: var(--ink)"><var>N</var> · 2 · (186473 + 70784 ln <var>N</var> + 50560 ln(<var>R</var>+2)) · (2<var>N</var>)<sup>46</sup>.</p>
+          <p>Upstream's own strategy in that model has the bound <var>x</var><sup>1510</sup>. The tree is only shown to exist in the query model. Its proposals are chosen non-constructively, and it is not connected to upstream's machine-model layer.</p>
+        </div>
+        <aside>
+          <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span></div>
+          <ul>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/upstream-patches/port/SPLPUpstream/Tree.lean"><code>exists_tree_explicit</code></a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/formal/SPLP/Strategy.lean"><code>exists_strategy_k4</code></a></li>
+          </ul>
+        </aside>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<section id="dead-ends">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Dead ends</p>
+      <h2>What does not work, and why</h2>
+      <p>Most of the effort after the first results went into looking for a structurally cheaper market step. None was found. The reasons are recorded so that nobody has to find them twice.</p>
+    </div>
+    <div class="dead">
+      <article>
+        <h3>Scaling the range</h3>
+        <p>Rounded demands need labels with a margin as large as the rounding, so each scale costs a full price search. Result 4.</p>
+        <span class="tag lean"><i>✓</i> Lean theorem</span>
+      </article>
+      <article>
+        <h3>Children that return one number</h3>
+        <p>If a child node returned the same multiple of every expert's input, the charge a failed child must pay could not be met. The proof does survive a thresholded return, but the experts above the threshold can hold most of the wealth, so the cell count does not drop.</p>
+        <span class="tag lean"><i>✓</i> Lean theorem</span>
+      </article>
+      <article>
+        <h3>Dynamic programming over pairwise comparisons</h3>
+        <p>The factor applied to an expert depends on which of its options is best. A function of the index of the maximum that factors over pairwise comparisons is constant, so the wealth is not a pairwise product model.</p>
+        <span class="tag lean"><i>✓</i> Lean theorem</span>
+      </article>
+      <article>
+        <h3>Sparse samples of experts</h3>
+        <p>The error of a weighted sample on ranges grows by a constant factor per update. Only closeness in total variation is stable under multiplicative updates, and such approximations are not sparse.</p>
+        <span class="tag est"><i>~</i> Not formalized</span>
+      </article>
+      <article>
+        <h3>Simpler experts</h3>
+        <p>Experts that bet on every slot above a threshold, or <var>k</var> single-slot experts in place of one, break the analysis: feedback is guaranteed only above the child's threshold, and the average log gain turns negative.</p>
+        <span class="tag est"><i>~</i> Not formalized</span>
+      </article>
+      <article>
+        <h3>Independent per-slot pools</h3>
+        <p>A product-form market over single guesses would need no recursion and <var>O</var>(<var>N</var> log <var>R</var>) queries. In simulation, labels that push non-maximal coordinates away keep it from converging even for <var>N</var> = 2.</p>
+        <span class="tag est"><i>~</i> Not formalized</span>
+      </article>
+      <article>
+        <h3>Approximate minimizers</h3>
+        <p>A point that nearly minimizes the potential in value need not satisfy the gain condition. The condition is about slopes, not values.</p>
+        <span class="tag est"><i>~</i> Not formalized</span>
+      </article>
+      <article>
+        <h3>Learning the maximum surplus</h3>
+        <p>The value of the maximum surplus cannot be obtained from the label oracle, and log <var>R</var> queries are needed already for <var>N</var> = 2. The range can only be shrunk at its source, in the compression constants.</p>
+        <span class="tag est"><i>~</i> Not formalized</span>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="directions">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="kicker">Current directions</p>
+      <h2>In progress and open</h2>
+      <p>Three tracks are running as of 28 November 2026. None has a verified result yet; this section will be updated when they land or fail.</p>
+    </div>
+    <div class="now">
+      <article>
+        <span class="state">In progress</span>
+        <h3>Upstream's <var>w</var><sup>8</sup> bit formula</h3>
+        <p>Upstream bounds the bit length of compressed values by about 80<var>w</var><sup>8</sup> in the width <var>w</var>. The preprint's text gives order <var>w</var><sup>4</sup><var>K</var>, at most about <var>w</var><sup>5</sup>. So upstream's formal chain loses about three powers of <var>w</var>, each worth a factor <var>N</var>³.</p>
+        <p>Goal: find where and recover what the existing proofs allow.</p>
+      </article>
+      <article>
+        <span class="state">In progress</span>
+        <h3>Upstream's search constants</h3>
+        <p>The 2<sup>557</sup> probes per node are pinned by a charging constant 2<sup>−272</sup> that comes from 64-coordinate skeletons. The preprint's text uses arity 4 and 2<sup>19</sup> probes.</p>
+        <p>Goal: retune the parameters consistently inside upstream's proof architecture.</p>
+      </article>
+      <article>
+        <span class="state">In progress</span>
+        <h3>The <var>N</var>² log <var>N</var> width, end to end</h3>
+        <p>The smaller width compiles for the mathematical core, but upstream's machine-model layer wants a polynomial bit budget, and a logarithm is not one.</p>
+        <p>Goal: scope whether the algorithm can run with the smaller width while the machine layer keeps a polynomial over-estimate.</p>
+      </article>
+    </div>
+
+    <ol class="open">
+      <li>
+        <div>
+          <h3>A market step whose cost does not grow with the number of probes</h3>
+          <p>The total cost is roughly (probes)<sup><var>k</var>+1</sup>, so one point of probe exponent costs five in the total for arity 4. Fewer cells, or cells that can be merged or forgotten, would matter more than any further constant tuning. Within this family of algorithms the <var>t</var><sup><var>k</var></sup> count looks robust. The one remaining lead is a data structure: the wealth evolves by range updates on the cells of a tropical arrangement, and partition trees with lazy updates might save one factor of <var>t</var>. Unverified.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>An explicit cost model for the market step</h3>
+          <p>Two pieces are missing between "what a market step has to handle" and a running time: the number of potential evaluations needed to reach a vertex minimizer, and the cost of counting the experts in a cell. Also open: a procedure that produces the approximate weights the tolerance theorem allows.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>Close the gaps in the precision argument</h3>
+          <p>Formalize that Section 4.3 of the preprint is exactly a system of two-slot comparisons, that calibration's rows have the form the coefficient bound assumes, and that the smaller constant <var>D</var> propagates through Lemmas 5.2 to 5.4. Until then the estimates log <var>R</var> ≈ <var>N</var><sup>11</sup> and <var>N</var><sup>9</sup> stay estimates.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>Connect the short strategy to a machine model</h3>
+          <p>The (2<var>N</var>)<sup>46</sup> tree exists in upstream's query model but its proposals are not computed. Upstream's machine-model layer simulates its own variant of the search, so replacing that variant is not a local change.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>An end-to-end exponent</h3>
+          <p>Nothing here multiplies the levels of the ledger together in one theorem. That needs the cost model above and a formalization of calibration, compression and the reduction from LP at the sharper constants.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section id="verify">
+  <div class="wrap">
+    <div class="two">
+      <div>
+        <div class="sec-head" style="margin-bottom:24px">
+          <p class="kicker">Scope</p>
+          <h2>What this project does not claim</h2>
+        </div>
+        <ul class="plain">
+          <li>It does not re-verify the preprint. Upstream's Lean development is taken as given and built locally; the patches here only change constants inside it.</li>
+          <li>There is no machine model in this repository's library. Runs are mathematical objects, and the cost statements bound the size of what must be handled, not the time of an implementation.</li>
+          <li>There is no end-to-end exponent for linear programming.</li>
+          <li>The figure "about 60" for the preprint is its own stated bound. Only the arithmetic behind it is checked here.</li>
+          <li>Comparisons between arities compare proved upper bounds. No lower bound on any cost is proved.</li>
+          <li>The Lean proofs were written by Claude, an AI model, working under direction. Their correctness rests on the Lean kernel, not on the author; the estimates have no such backing.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="sec-head" style="margin-bottom:24px">
+          <p class="kicker">Verify</p>
+          <h2>Check it yourself</h2>
+        </div>
+        <p class="cap">The library. Needs <a href="https://github.com/leanprover/elan">elan</a>; the first command downloads a prebuilt Mathlib.</p>
+<pre>git clone https://github.com/klamike/stronglypolynomial
+cd stronglypolynomial/formal
+lake exe cache get &amp;&amp; lake build</pre>
+        <p class="cap">The patches to upstream. The first two commands check out openai/math at a pinned commit; the build scripts then download upstream's toolchain and Mathlib (about 8 GB) and take on the order of half an hour.</p>
+<pre>scripts/fetch-upstream.sh
+git -C src sparse-checkout add lean/OAI/Computability
+<span class="c"># 54-module compression core, smaller width</span>
+upstream-patches/build-core.sh
+<span class="c"># width, clock and radius patches, up to the top-level theorems</span>
+upstream-patches/build-full.sh
+<span class="c"># the short strategy against upstream's query model</span>
+upstream-patches/port/build-port.sh</pre>
+        <p class="cap">Toolchains: Lean 4.33.0-rc1 for the library, Lean 4.34.1 for upstream. The library builds unchanged under both.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Starting point: <a href="https://github.com/openai/math/tree/main/preprints/Strongly-polynomial-linear-programming-November-24-2026"><em>Strongly polynomial linear programming</em></a>, OpenAI preprint, 24 November 2026.</span>
+    <span><a href="https://github.com/klamike/stronglypolynomial">github.com/klamike/stronglypolynomial</a> · last updated 28 November 2026</span>
+  </div>
+</footer>
+
+</body>
+</html>
