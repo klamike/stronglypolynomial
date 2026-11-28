@@ -1,0 +1,1250 @@
+--- a/OAI/Optimization/LinearProgramming/Compression/BitBudget.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/BitBudget.lean
+@@ -15,33 +15,36 @@
+ namespace LinearProgramming
+ namespace Compression
+ 
+-/-- Cut bound valid simultaneously for every auxiliary dimension at most `width`. -/
+-def fiberProjectionBudget (k width H : ℕ) : ℕ :=
+-  ∑ d ∈ Finset.range (width+1), projectionCoefficientBound d (clearedProjectionRowBound k d H)
++/-- Cut bound valid simultaneously for every auxiliary dimension at most `width`.
++The fiber system has integral coefficients on the committed coordinates, so the cleared
++row height `fiberClearedRowBound` does not depend on their number: the first argument
++is kept only for the callers and is not used. -/
++def fiberProjectionBudget (_k width H : ℕ) : ℕ :=
++  ∑ d ∈ Finset.range (width+1), projectionCoefficientBound d (fiberClearedRowBound d H)
+ 
+ theorem fiberProjectionBudget_term_le (k width H : ℕ) {d : ℕ} (hd : d ≤ width) :
+-    projectionCoefficientBound d (clearedProjectionRowBound k d H) ≤ fiberProjectionBudget k width H :=
+-  Finset.single_le_sum (f := fun d => projectionCoefficientBound d (clearedProjectionRowBound k d H))
++    projectionCoefficientBound d (fiberClearedRowBound d H) ≤ fiberProjectionBudget k width H :=
++  Finset.single_le_sum (f := fun d => projectionCoefficientBound d (fiberClearedRowBound d H))
+     (fun _ _ => Nat.zero_le _) (Finset.mem_range.mpr (Nat.lt_succ_of_le hd))
+ 
+ /-- Exponent for the sum of projected-cut bounds over every auxiliary dimension. -/
+-def fiberProjectionBits (k width L : ℕ) : ℕ := width+1+projectionTestBitBound k width L
++def fiberProjectionBits (_k width L : ℕ) : ℕ := width+1+fiberTestBitBound width L
+ 
+ theorem fiberProjectionBudget_le_two_pow (k width H L : ℕ) (hH : H ≤ 2^L) :
+     fiberProjectionBudget k width H ≤ 2^fiberProjectionBits k width L := by
+   have mono {d : ℕ} (hd : d ≤ width) :
+-      projectionTestBitBound k d L ≤ projectionTestBitBound k width L := by
+-    unfold projectionTestBitBound
++      fiberTestBitBound d L ≤ fiberTestBitBound width L := by
++    unfold fiberTestBitBound
+     dsimp only
+     gcongr
+   calc
+-    _ ≤ ∑ _d ∈ Finset.range (width+1), 2^projectionTestBitBound k width L := by
++    _ ≤ ∑ _d ∈ Finset.range (width+1), 2^fiberTestBitBound width L := by
+       apply Finset.sum_le_sum
+       intro d hd
+-      exact (projection_test_height_le_pow k d H L hH).trans
++      exact (fiber_test_height_le_pow d H L hH).trans
+         (Nat.pow_le_pow_right (by decide) (mono (Nat.le_of_lt_succ (Finset.mem_range.mp hd))))
+-    _ = (width+1)*2^projectionTestBitBound k width L := by simp
+-    _ ≤ 2^(width+1)*2^projectionTestBitBound k width L :=
++    _ = (width+1)*2^fiberTestBitBound width L := by simp
++    _ ≤ 2^(width+1)*2^fiberTestBitBound width L :=
+       Nat.mul_le_mul_right _ (width+1).lt_two_pow_self.le
+     _ = _ := (pow_add ..).symm
+ 
+@@ -146,7 +149,7 @@
+     (hd : d ≤ d') (hL : L ≤ L') (hA : A ≤ A') :
+     fiberValueBits k w d L A ≤ fiberValueBits k' w' d' L' A' := by
+   unfold fiberValueBits fiberPointBits fiberPinnedBits fiberCommitBits fiberCommitCapFormula fiberCommitInputBits
+-    fiberProjectionBits projectionTestBitBound
++    fiberProjectionBits fiberTestBitBound
+   dsimp only
+   gcongr
+ 
+@@ -177,22 +180,147 @@
+     _ ≤ 2^((k+1+2)+(k+1+3))*2^(B+7) := Nat.mul_le_mul_right _ hx
+     _ = 2^(((k+1+2)+(k+1+3))+(B+7)) := (pow_add ..).symm
+     _ ≤ _ := Nat.pow_le_pow_right (by decide) (by omega)
++
++/-! ### The pinned system with one common denominator
++
++The bounds above treat every row of the pinned system as a row of height
++`fiberPinnedHeight` and every coordinate of its Cramer point as a separate fraction.
++`PinnedPoint.lean` uses that the commitment is an integer vector over one denominator of
++height `G`, solves the pinned system for the multiple of the point by that denominator,
++and keeps the common Cramer denominator. This gives the following smaller caps. -/
++
++/-- Common numerator and denominator bound for the Cramer point of the pinned system:
++clipping rows of height `H` are cleared to `H^(s+2)`, and the commitment height `G`
++enters once, through the right-hand side. -/
++def pinnedPointCap (s H G : ℕ) : ℕ := (s+1).factorial * (H^(s+2))^(s+1) * G
++
++/-- Bound for an affine evaluation, with coefficients of height `C`, of a point whose
++coordinates have numerators and one common denominator of height `Y`. -/
++def pinnedValueCap (s C Y : ℕ) : ℕ := (s+1) * (C+1)^(s+2) * Y
++
++theorem pinnedPointCap_mono {s t H G : ℕ} (hst : s ≤ t) (hH : 0 < H) :
++    pinnedPointCap s H G ≤ pinnedPointCap t H G := by
++  unfold pinnedPointCap
++  apply Nat.mul_le_mul_right
++  apply Nat.mul_le_mul (Nat.factorial_le (Nat.succ_le_succ hst))
++  calc
++    _ ≤ (H^(t+2))^(s+1) :=
++      Nat.pow_le_pow_left (Nat.pow_le_pow_right hH (Nat.add_le_add_right hst 2)) _
++    _ ≤ _ := Nat.pow_le_pow_right (Nat.pow_pos hH) (Nat.succ_le_succ hst)
++
++theorem pinnedPointCap_le_two_pow (s : ℕ) {H G L c : ℕ} (hH : H ≤ 2^L) (hG : G ≤ 2^c) :
++    pinnedPointCap s H G ≤ 2^((s+1)*(s+1) + L*(s+2)*(s+1) + c) := by
++  have hf : (s+1).factorial ≤ (2^(s+1))^(s+1) :=
++    (Nat.factorial_le_pow (s+1)).trans (Nat.pow_le_pow_left (s+1).lt_two_pow_self.le (s+1))
++  unfold pinnedPointCap
++  calc
++    _ ≤ (2^(s+1))^(s+1) * ((2^L)^(s+2))^(s+1) * 2^c :=
++      Nat.mul_le_mul (Nat.mul_le_mul hf (Nat.pow_le_pow_left (Nat.pow_le_pow_left hH _) _)) hG
++    _ = _ := by rw [← pow_mul, ← pow_mul, ← pow_mul, ← pow_add, ← pow_add, Nat.mul_assoc]
++
++/-- Exponent for the common-denominator point of the pinned system. The commitment
++exponent enters once, not once per variable and per cleared entry. -/
++def pinnedPointBits (k width dim L : ℕ) : ℕ :=
++  (dim+1)*(dim+1) + L*(dim+2)*(dim+1) + fiberCommitBits k width L
++
++theorem pinnedPointHeight_le_two_pow (k width dim H L : ℕ) (hH : H ≤ 2^L) :
++    pinnedPointCap dim H (fiberCommitCap k ((k+1)*fiberProjectionBudget k width H+1)) ≤
++      2^pinnedPointBits k width dim L :=
++  pinnedPointCap_le_two_pow dim hH (fiberCommitCap_budget_le_two_pow k width H L hH)
++
++/-- Exponent for an affine minor value at the common-denominator point, on coefficients
++of height at most `2^A`. The point exponent enters once. -/
++def pinnedValueBits (k width dim L A : ℕ) : ℕ :=
++  dim+1 + (A+1)*(dim+2) + pinnedPointBits k width dim L
++
++theorem pinnedValueHeight_le_two_pow (k width dim H L C A : ℕ) (hH : H ≤ 2^L) (hC : C ≤ 2^A) :
++    pinnedValueCap dim C
++        (pinnedPointCap dim H (fiberCommitCap k ((k+1)*fiberProjectionBudget k width H+1))) ≤
++      2^pinnedValueBits k width dim L A := by
++  unfold pinnedValueCap pinnedValueBits
++  rw [pow_add 2 _ (pinnedPointBits k width dim L), pow_add 2 (dim+1) _, pow_mul 2 (A+1) _]
++  exact Nat.mul_le_mul (Nat.mul_le_mul (dim+1).lt_two_pow_self.le
++    (Nat.pow_le_pow_left (succ_le_next_two_pow hC) _))
++    (pinnedPointHeight_le_two_pow k width dim H L hH)
++
++theorem pinnedValueBits_mono {k k' w w' d d' L L' A A' : ℕ} (hk : k ≤ k') (hw : w ≤ w')
++    (hd : d ≤ d') (hL : L ≤ L') (hA : A ≤ A') :
++    pinnedValueBits k w d L A ≤ pinnedValueBits k' w' d' L' A' := by
++  unfold pinnedValueBits pinnedPointBits fiberCommitBits fiberCommitCapFormula fiberCommitInputBits
++    fiberProjectionBits fiberTestBitBound
++  dsimp only
++  gcongr
+ 
++/-- The common-denominator exponent is below the exponent of the separate-fraction
++bound (for a system with at least one variable), which therefore remains a valid
++over-estimate. -/
++theorem pinnedValueBits_le_fiberValueBits (k width dim L A : ℕ) (hdim : 1 ≤ dim) :
++    pinnedValueBits k width dim L A ≤ fiberValueBits k width dim L A := by
++  unfold pinnedValueBits pinnedPointBits fiberValueBits fiberPointBits fiberPinnedBits
++  generalize fiberCommitBits k width L = c
++  obtain ⟨e, rfl⟩ : ∃ e, dim = e+1 := ⟨dim-1, by omega⟩
++  nlinarith [Nat.zero_le (L*e), Nat.zero_le (L*e*e), Nat.zero_le (L*e*e*e), Nat.zero_le (c*e),
++    Nat.zero_le (c*e*e), Nat.zero_le (c*e*e*e), Nat.zero_le (e*e), Nat.zero_le (e*e*e),
++    Nat.zero_le (A*e)]
++
++/-- Dimension-uniform bound for a completed epoch through the common-denominator point,
++with the actual clipping precision and row height of Section 3. -/
++theorem pinned_uniform_value_height_le_two_pow (B width X Xbits k dim : ℕ)
++    (hk : k ≤ width) (hd : dim ≤ width) (hX : X ≤ 2^Xbits) :
++    let E := (2:ℕ)^(B+7)
++    let C := max X (2*E)
++    let H := (B+17+4*C)*(E*C^4)
++    let A := fiberCoefficientBits B Xbits
++    pinnedValueCap dim C
++        (pinnedPointCap dim H (fiberCommitCap k ((k+1)*fiberProjectionBudget k width H+1))) ≤
++      2^pinnedValueBits width width width (fiberClipBits B A) A := by
++  dsimp only
++  have hC := fiberCoefficientHeight_le_two_pow B X Xbits hX
++  exact (pinnedValueHeight_le_two_pow k width dim _ _ _ _ (fiberClipHeight_le_two_pow B _ _ hC) hC).trans
++    (Nat.pow_le_pow_right (by decide) (pinnedValueBits_mono hk le_rfl hd le_rfl le_rfl))
++
++/-- For the manuscript width the linear factor `k+4` of the request cutoff is at most
++`2^(3N+3)`, so the cutoff costs `width + 3N` bits rather than `2*width`. -/
++theorem manuscript_request_height_le_two_pow (N : ℕ) {k B : ℕ} (hk : k ≤ (7*N^2+8)*N+1) :
++    requestCutoff (k+1) * 2^(B+7) ≤ 2^((7*N^2+8)*N+1+3*N+B+13) := by
++  have hN : N+1 ≤ 2^N := N.lt_two_pow_self
++  have hcube : (N+1)^3 ≤ 2^(N*3) := by
++    rw [pow_mul]
++    exact Nat.pow_le_pow_left hN 3
++  have hk4 : k+1+3 ≤ 8*(N+1)^3 := by
++    have h₁ : 8*(N+1)^3 = 8*N^3+24*N^2+24*N+8 := by ring
++    have h₂ : (7*N^2+8)*N+1 = 7*N^3+8*N+1 := by ring
++    have := Nat.zero_le (N^2)
++    have := Nat.zero_le (N^3)
++    omega
++  have hw : k+1+3 ≤ 2^(3*N+3) := by
++    calc
++      k+1+3 ≤ 8*(N+1)^3 := hk4
++      _ ≤ 8*2^(N*3) := Nat.mul_le_mul_left _ hcube
++      _ = 2^(3*N+3) := by rw [Nat.mul_comm 3 N, pow_add]; ring
++  unfold requestCutoff
++  calc
++    _ ≤ 2^((7*N^2+8)*N+1+3)*2^(3*N+3)*2^(B+7) :=
++      Nat.mul_le_mul_right _ (Nat.mul_le_mul (Nat.pow_le_pow_right (by decide) (by omega)) hw)
++    _ = _ := by
++      rw [← pow_add, ← pow_add]
++      congr 1
++      omega
++
+ /-- The composition of the preceding bounds, interpreted over any commutative
+ semiring so that it can be used both as an actual polynomial and as a natural budget. -/
+ def onlineMinorBitFormula {R : Type*} [CommSemiring R] (N : R) : R :=
+   let w := (7*N^2+8)*N+1
+   let B := 6*N+16
+-  let a := (2*w+B+14)+B+8
++  let a := (w+3*N+B+13)+B+8
+   let L := ((B+17)+(2+a)+1)+((B+7)+a*4)
+   let n := w+1
+-  let u := L*(w+w+2)
+-  let cuts := w+1+(n+((n*n+(n+u*2)*n)*2+u))
++  let u := L*(w+2)
++  let cuts := w+1+(n+((n*n+(n+u*2)*n)+u))
+   let m := w+1+cuts+1
+   let commitment := fiberCommitCapFormula w m
+-  let pinned := L+commitment+2
+-  let point := w*w+pinned*(w+2)*w
+-  w+1+((a+1)+(point+1))*(w+2)
++  let point := (w+1)*(w+1)+L*(w+2)*(w+1)+commitment
++  w+1+(a+1)*(w+2)+point
+ 
+ /-- A fixed integer-coefficient polynomial bounding the binary lengths of the online
+ compression outputs, independently of the input scalars and of the transcript. -/
+@@ -213,11 +341,27 @@
+     let E := (2:ℕ)^(B+7)
+     let C := max (requestCutoff (k+1)*E) (2*E)
+     let H := (B+17+4*C)*(E*C^4)
+-    offlineValueCap dim C (offlinePointCap dim (fiberPinnedHeight k width H)) ≤
++    pinnedValueCap dim C
++        (pinnedPointCap dim H (fiberCommitCap k ((k+1)*fiberProjectionBudget k width H+1))) ≤
+       2^(onlineMinorBitPolynomial.eval N) := by
+   rw [onlineMinorBitPolynomial_eval]
+-  exact fiber_uniform_value_height_le_two_pow _ _ _ _ _ _ hk hd (fiber_request_height_le_two_pow hk)
++  exact pinned_uniform_value_height_le_two_pow _ _ _ _ _ _ hk hd
++    (manuscript_request_height_le_two_pow N hk)
+ 
++/-- The separate-fraction caps of the pinned system keep their own (larger) exponent.
++This is the bound upstream used for the output size before the common-denominator point. -/
++theorem fiber_manuscript_value_height_coarse (N k dim : ℕ) (hk : k ≤ (7*N^2+8)*N+1)
++    (hd : dim ≤ (7*N^2+8)*N+1) :
++    let width := (7*N^2+8)*N+1
++    let B := 6*N+16
++    let E := (2:ℕ)^(B+7)
++    let C := max (requestCutoff (k+1)*E) (2*E)
++    let H := (B+17+4*C)*(E*C^4)
++    let A := fiberCoefficientBits B (2*width+B+14)
++    offlineValueCap dim C (offlinePointCap dim (fiberPinnedHeight k width H)) ≤
++      2^fiberValueBits width width width (fiberClipBits B A) A :=
++  fiber_uniform_value_height_le_two_pow _ _ _ _ _ _ hk hd (fiber_request_height_le_two_pow hk)
++
+ end Compression
+ end LinearProgramming
+ end Optimization
+--- a/OAI/Optimization/LinearProgramming/Compression/Commit.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/Commit.lean
+@@ -197,6 +197,35 @@
+     (fun i => x (e.symm i)) (Nat.succ_pos _)
+   exact ⟨fun i => γ (e i), fun i => hb (e i), projection_tests_of_requestSigns e x γ Q hγ⟩
+ 
++/-- The commitment of `exists_bounded_projection_commit` with its integer presentation:
++it is obtained by dividing an integer vector by its last coordinate, so the coordinates
++are integers over one positive integer, all strictly below the height bound. -/
++theorem exists_bounded_projection_commit_common {κ : Type*} [Fintype κ] (x : κ → ℝ) (Q : ℕ) :
++    ∃ γ : κ → ℚ,
++      (∀ i, (γ i).num.natAbs < commitHeight (Fintype.card κ) ((Fintype.card κ+1)*Q+1) ∧
++        (γ i).den < commitHeight (Fintype.card κ) ((Fintype.card κ+1)*Q+1)) ∧
++      (∀ (a : κ → ℤ) (b : ℤ), (∀ i, (a i).natAbs ≤ Q) → b.natAbs ≤ Q →
++        (∑ i, (a i : ℝ) * x i) ≤ b → (∑ i, (a i : ℝ) * (γ i : ℝ)) ≤ b) ∧
++      ∃ (q : ℤ) (z : κ → ℤ), 0 < q ∧
++        q.natAbs < commitHeight (Fintype.card κ) ((Fintype.card κ+1)*Q+1) ∧
++        ∀ i, (z i).natAbs < commitHeight (Fintype.card κ) ((Fintype.card κ+1)*Q+1) ∧
++          γ i = (z i : ℚ) / (q : ℚ) := by
++  classical
++  let e := Fintype.equivFin κ
++  let M := (Fintype.card κ + 1) * Q + 1
++  have hM : 0 < M := Nat.succ_pos _
++  obtain ⟨z, hzb, hz⟩ := Lattice.exists_bounded_sign_representative
++    (Nat.succ_pos (Fintype.card κ)) hM (Fin.snoc (fun i => x (e.symm i)) (1 : ℝ))
++  obtain ⟨hq, hb, _, hγ⟩ := normalizeCommit_spec (fun i => x (e.symm i)) hM z hzb hz
++  have hnat (i : Fin (Fintype.card κ + 1)) :
++      (z i).natAbs < commitHeight (Fintype.card κ) M := by
++    have h : ((z i).natAbs : ℤ) < (commitHeight (Fintype.card κ) M : ℤ) := by
++      simpa [commitHeight, Int.natCast_natAbs] using hzb i
++    exact_mod_cast h
++  exact ⟨fun i => normalizeCommit z (e i), fun i => hb (e i),
++    projection_tests_of_requestSigns e x _ Q hγ,
++    z (Fin.last _), fun i => z (e i).castSucc, hq, hnat _, fun i => ⟨hnat _, rfl⟩⟩
++
+ end Compression
+ end LinearProgramming
+ end Optimization
+--- a/OAI/Optimization/LinearProgramming/Compression/CommitProgram.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/CommitProgram.lean
+@@ -71,6 +71,25 @@
+   obtain ⟨_, hh, hs, ht⟩ := normalizeCommit_spec_of_height x hM z hheight hz
+   exact ⟨fun i => ⟨Nat.size_le.mpr (hh i).1, Nat.size_le.mpr (hh i).2⟩, hs, ht⟩
+ 
++/-- The computed commitment in its integer presentation: integers over one positive
++integer denominator, all of the stated binary size. -/
++theorem computeCommitWith_common {d M : ℕ} (x : Fin d → ℝ) (hM : 0 < M)
++    (select : (Fin (d+1) → ℚ) → ℕ × (Fin (d+1) → ℤ))
++    (hsel : ∀ u, 0 < (select u).1 ∧ (select u).1 ≤ searchDenominator (d+1) M ^ ((d+1)+1) ∧
++      ∀ i, |((select u).1 : ℚ) * u i - (select u).2 i| ≤ 1 / (8 * ((d+1 : ℕ) : ℚ) * M))
++    (negative : (Fin d → ℤ) → ℤ → Bool)
++    (ho : ∀ a c, negative a c = true ↔ requestForm x a + c < 0) :
++    ∃ (q : ℤ) (z : Fin d → ℤ), 0 < q ∧ q.natAbs.size ≤ affineCommitWidth d M ∧
++      ∀ i, (z i).natAbs.size ≤ affineCommitWidth d M ∧
++        computeCommitWith M select negative i = (z i : ℚ) / (q : ℚ) := by
++  let z := SignQueries.run (affineCommitReply negative) (roundingProgramWith M select)
++  obtain ⟨hzb, hz⟩ := roundingProgramWith_correct (Nat.succ_pos d) hM select hsel
++    (Fin.snoc x (1 : ℝ)) (affineCommitReply negative) (affineCommitReply_correct x negative ho)
++  have hheight (i : Fin (d+1)) : (z i).natAbs < 2^(affineCommitWidth d M) :=
++    Nat.size_le.mp (hzb i)
++  obtain ⟨hq, _⟩ := normalizeCommit_spec_of_height x hM z hheight hz
++  exact ⟨z (Fin.last d), fun i => z i.castSucc, hq, hzb _, fun i => ⟨hzb _, rfl⟩⟩
++
+ /-- Every execution makes at most the stated number of affine comparisons,
+ including executions with inconsistent oracle answers. -/
+ theorem computeCommitWith_query_count {d : ℕ} (M : ℕ)
+@@ -96,6 +115,14 @@
+     RequestSigns x (fun i => (γ i : ℝ)) M :=
+   computeCommitWith_spec x hM _ (search_selector_correct (Nat.succ_pos d) hM) negative ho
+ 
++theorem computeCommit_common {d M : ℕ} (x : Fin d → ℝ) (hM : 0 < M)
++    (negative : (Fin d → ℤ) → ℤ → Bool)
++    (ho : ∀ a c, negative a c = true ↔ requestForm x a + c < 0) :
++    ∃ (q : ℤ) (z : Fin d → ℤ), 0 < q ∧ q.natAbs.size ≤ affineCommitWidth d M ∧
++      ∀ i, (z i).natAbs.size ≤ affineCommitWidth d M ∧
++        computeCommit M negative i = (z i : ℚ) / (q : ℚ) :=
++  computeCommitWith_common x hM _ (search_selector_correct (Nat.succ_pos d) hM) negative ho
++
+ end Compression
+ end LinearProgramming
+ end Optimization
+--- a/OAI/Optimization/LinearProgramming/Compression/ComputedEpoch.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ComputedEpoch.lean
+@@ -16,15 +16,23 @@
+     (e : κ ≃ Fin d) (x : κ → ℝ) (γ : Fin d → ℚ) (width H : ℕ)
+     (hs : ∀ i, (γ i).num.natAbs.size ≤ affineCommitWidth d (epochFormBudget d width H) ∧
+       (γ i).den.size ≤ affineCommitWidth d (epochFormBudget d width H))
++    (hcommon : ∃ (q : ℤ) (z : Fin d → ℤ), 0 < q ∧
++      q.natAbs.size ≤ affineCommitWidth d (epochFormBudget d width H) ∧
++      ∀ i, (z i).natAbs.size ≤ affineCommitWidth d (epochFormBudget d width H) ∧
++        γ i = (z i : ℚ) / (q : ℚ))
+     (ht : RequestSigns (fun i => x (e.symm i)) (fun i => (γ i : ℝ)) (epochFormBudget d width H)) :
+     ValidEpochCommit x width H (fun j => γ (e j)) := by
+   have hd : Fintype.card κ = d := (Fintype.card_congr e).trans (Fintype.card_fin _)
+-  constructor
++  obtain ⟨q, z, hq, hqs, hz⟩ := hcommon
++  refine ⟨?_, ?_, ?_⟩
+   · intro i
+     rw [hd]
+     exact ⟨computed_lt_fiberCommitCap (hs (e i)).1, computed_lt_fiberCommitCap (hs (e i)).2⟩
+   · rw [hd]
+     exact projection_tests_of_requestSigns e x γ (fiberProjectionBudget d width H) ht
++  · rw [hd]
++    exact ⟨q, fun j => z (e j), hq, computed_lt_fiberCommitCap hqs,
++      fun j => ⟨computed_lt_fiberCommitCap (hz (e j)).1, (hz (e j)).2⟩⟩
+ 
+ /-- The searchable, deterministic reference variant of the commitment stage. -/
+ def computedEpochCommit {κ : Type*} {d : ℕ} (e : κ ≃ Fin d)
+@@ -37,7 +45,8 @@
+     ValidEpochCommit x width H (computedEpochCommit e width H negative) := by
+   have hM : 0 < epochFormBudget d width H := Nat.zero_lt_succ _
+   obtain ⟨hs,_,ht⟩ := computeCommit_spec (fun i => x (e.symm i)) hM negative ho
+-  exact validEpochCommit_of_encoded_signs e x _ width H hs ht
++  exact validEpochCommit_of_encoded_signs e x _ width H hs
++    (computeCommit_common (fun i => x (e.symm i)) hM negative ho) ht
+ 
+ /-- A different implementation of the rational approximation step may be substituted
+ without changing the committed-coordinate guarantee. -/
+@@ -57,7 +66,8 @@
+     ValidEpochCommit x width H (computedEpochCommitWith e width H select negative) := by
+   have hM : 0 < epochFormBudget d width H := Nat.zero_lt_succ _
+   obtain ⟨hs,_,ht⟩ := computeCommitWith_spec (fun i => x (e.symm i)) hM select hsel negative ho
+-  exact validEpochCommit_of_encoded_signs e x _ width H hs ht
++  exact validEpochCommit_of_encoded_signs e x _ width H hs
++    (computeCommitWith_common (fun i => x (e.symm i)) hM select hsel negative ho) ht
+ 
+ end Compression
+ end LinearProgramming
+--- a/OAI/Optimization/LinearProgramming/Compression/Epoch.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/Epoch.lean
+@@ -2,6 +2,7 @@
+ import OAI.Optimization.LinearProgramming.Compression.BitBudget
+ import OAI.Optimization.LinearProgramming.Compression.CommitCap
+ import OAI.Optimization.LinearProgramming.Compression.FiberProjection
++import OAI.Optimization.LinearProgramming.Compression.PinnedPoint
+ import OAI.Optimization.LinearProgramming.Compression.ProjectionSmallPoint
+ import OAI.Optimization.LinearProgramming.Compression.Representatives
+ 
+@@ -23,10 +24,14 @@
+ generator proxies and size parameters, independently of all future requests. -/
+ noncomputable def epochCommit {σ : Type*} [Fintype σ] (x : σ → ℝ)
+     (width rowHeight : ℕ) : σ → ℚ :=
+-  Classical.choose (exists_bounded_projection_commit x (fiberProjectionBudget (Fintype.card σ) width rowHeight))
++  Classical.choose (exists_bounded_projection_commit_common x
++    (fiberProjectionBudget (Fintype.card σ) width rowHeight))
+ 
+ /-- The exact guarantee needed from the executable sign-rounding procedure.
+-It refers to integer halfspaces and includes tests at equality. -/
++It refers to integer halfspaces and includes tests at equality. The field `common`
++records that the committed coordinates are integers over one positive integer (both
++rounding procedures normalize an integer vector by its last coordinate); the point of the
++pinned system then has a height linear in the commitment height. -/
+ structure ValidEpochCommit {σ : Type*} [Fintype σ] (x : σ → ℝ)
+     (width H : ℕ) (γ : σ → ℚ) : Prop where
+   size : ∀ j, (γ j).num.natAbs < fiberCommitCap (Fintype.card σ)
+@@ -37,18 +42,29 @@
+     (∀ j, (a j).natAbs ≤ fiberProjectionBudget (Fintype.card σ) width H) →
+     c.natAbs ≤ fiberProjectionBudget (Fintype.card σ) width H →
+     (∑ j, (a j : ℝ) * x j) ≤ c → (∑ j, (a j : ℝ) * (γ j : ℝ)) ≤ c
++  common : ∃ (q : ℤ) (z : σ → ℤ), 0 < q ∧
++    q.natAbs < fiberCommitCap (Fintype.card σ)
++      ((Fintype.card σ+1)*fiberProjectionBudget (Fintype.card σ) width H+1) ∧
++    ∀ j, (z j).natAbs < fiberCommitCap (Fintype.card σ)
++        ((Fintype.card σ+1)*fiberProjectionBudget (Fintype.card σ) width H+1) ∧
++      γ j = (z j : ℚ) / (q : ℚ)
+ 
+ theorem epochCommit_valid {σ : Type*} [Fintype σ] (x : σ → ℝ) (width H : ℕ) :
+     ValidEpochCommit x width H (epochCommit x width H) := by
+   have h := Classical.choose_spec
+-    (exists_bounded_projection_commit x (fiberProjectionBudget (Fintype.card σ) width H))
++    (exists_bounded_projection_commit_common x (fiberProjectionBudget (Fintype.card σ) width H))
++  obtain ⟨q, z, hq, hqb, hz⟩ := h.2.2
+   exact ⟨fun j => ⟨(h.1 j).1.trans_le (commitHeight_le_fiberCommitCap ..),
+-    (h.1 j).2.trans_le (commitHeight_le_fiberCommitCap ..)⟩, h.2⟩
++    (h.1 j).2.trans_le (commitHeight_le_fiberCommitCap ..)⟩, h.2.1,
++    q, z, hq, hqb.trans_le (commitHeight_le_fiberCommitCap ..),
++    fun j => ⟨(hz j).1.trans_le (commitHeight_le_fiberCommitCap ..), (hz j).2⟩⟩
+ 
+ /-- Uniform (numerator and denominator) bound for the entire assignment rather than
+-only the minor replies that were requested. -/
++only the minor replies that were requested. The point of the pinned system is taken with
++one common denominator, and the height of the commitment enters it once. -/
+ def epochValueCap (k width B E C : ℕ) : ℕ :=
+-  offlineValueCap width C (offlinePointCap width (fiberPinnedHeight k width (epochRowHeight B E C)))
++  pinnedValueCap width C (pinnedPointCap width (epochRowHeight B E C)
++    (fiberCommitCap k ((k+1)*fiberProjectionBudget k width (epochRowHeight B E C)+1)))
+ 
+ private theorem cast_matrix_feasible {α κ : Type*} [Fintype κ]
+     {A : Matrix α κ ℚ} {b : α → ℚ} {y : κ → ℚ} (h : A *ᵥ y ≤ b) :
+@@ -80,7 +96,7 @@
+   let k := Fintype.card σ
+   let H := epochRowHeight B E C
+   let Q := fiberProjectionBudget k width H
+-  let K := fiberPinnedHeight k width H
++  let G := fiberCommitCap k ((k+1)*Q+1)
+   have hH : 1 ≤ H := Nat.succ_le_of_lt (by dsimp [H,epochRowHeight]; positivity)
+   have hη : (0 : ℚ) < 1 / E := by positivity
+   have hηcast : (((1 / (E : ℚ)) : ℚ) : ℝ) = 1 / (E : ℝ) := by simp
+@@ -99,19 +115,16 @@
+   have hproj := preserves_generator_fiber A b anchor hH hA hb
+     (x := x ∘ anchor) (x' := fun j => (γ j : ℝ)) ⟨x, hx, fun _ => rfl⟩
+     (fun a c ha hbc => hγ.tests a c (fun j => (ha j).trans hbudget) (hbc.trans hbudget))
+-  have hHK : H ≤ K := by dsimp [K,fiberPinnedHeight]; omega
+-  have hK : 1 ≤ K := hH.trans hHK
+-  have hγK (j : σ) : (γ j).num.natAbs ≤ K ∧ (γ j).den ≤ K := by
+-    have hcommit : fiberCommitCap k ((k+1)*Q+1) ≤ K := by dsimp [K,fiberPinnedHeight,Q]; omega
+-    exact ⟨(hγ.size j).1.le.trans hcommit, (hγ.size j).2.le.trans hcommit⟩
+-  obtain ⟨y,hy,hfix,hsize⟩ := exists_small_rat_feasible_with_fixed A b anchor γ hK
+-    (fun t j => ⟨(hA t j).1.trans hHK, (hA t j).2.trans hHK⟩)
+-    (fun t => ⟨(hb t).1.trans hHK, (hb t).2.trans hHK⟩) hγK hproj
+-  refine ⟨y, hfix, ?_, ?_⟩
+-  · have hcap := offlinePointCap_mono hw hK
+-    intro u
+-    exact affine_evalRat_height F y u width C (offlinePointCap width K) hw (hc u) (ho u)
+-      (fun j => ⟨(hsize j).1.trans hcap, (hsize j).2.trans hcap⟩)
++  obtain ⟨q,z,hq,hqG,hz⟩ := hγ.common
++  obtain ⟨D,n,hD,hDb,hnb,hy,hfix⟩ :=
++    exists_common_denominator_feasible_with_fixed A b anchor γ q z (G := G) hH hA hb hq hqG.le
++      (fun j => (hz j).1.le) (fun j => (hz j).2) hproj
++  have hcap : pinnedPointCap (Fintype.card κ) H G ≤ pinnedPointCap width H G :=
++    pinnedPointCap_mono hw hH
++  refine ⟨fun j => (n j : ℚ) / (D : ℚ), hfix, ?_, ?_⟩
++  · intro u
++    exact affine_evalRat_common_height F u width C (pinnedPointCap width H G) hw (hc u) (ho u)
++      D n hD (hDb.trans hcap) (fun j => (hnb j).trans hcap)
+   · intro a ha
+     have hrow := (comparisonRows_iff_mulVec_le F B _ trueLog _).mpr
+       (cast_matrix_feasible hy) a ha
+--- a/OAI/Optimization/LinearProgramming/Compression/FiberProjection.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/FiberProjection.lean
+@@ -36,17 +36,17 @@
+       ∀ j, y (anchor j) = x j)
+     (tests : ∀ (a : σ → ℤ) (c : ℤ), (∀ j, (a j).natAbs ≤
+         projectionCoefficientBound (Fintype.card κ)
+-          (clearedProjectionRowBound (Fintype.card σ) (Fintype.card κ) B)) →
++          (fiberClearedRowBound (Fintype.card κ) B)) →
+       c.natAbs ≤ projectionCoefficientBound (Fintype.card κ)
+-        (clearedProjectionRowBound (Fintype.card σ) (Fintype.card κ) B) →
++        (fiberClearedRowBound (Fintype.card κ) B) →
+       (∑ j, (a j : ℝ) * x j) ≤ c → (∑ j, (a j : ℝ) * x' j) ≤ c) :
+     ∃ y, A.map (Rat.cast : ℚ → ℝ) *ᵥ y ≤ (fun i => (b i : ℝ)) ∧ ∀ j, y (anchor j) = x' j := by
+   obtain ⟨y, hy⟩ := hx
+   have hform := (fiber_transfer_system A b anchor x y).mpr hy
+-  obtain ⟨y', hy'⟩ := rational_projection_of_preserving_affine_tests
++  obtain ⟨y', hy'⟩ := rational_projection_of_preserving_affine_tests_of_unit
+     (fiberParameter (ι := ι) (σ := σ) (K := ℚ)) (fiberRows A anchor)
+-    (fiberConstant b) (B := B)
+-    (fun s j => ⟨(fiberParameter_height s j).1.trans hB, (fiberParameter_height s j).2.trans hB⟩)
++    (fiberConstant b) (B := B) hB
++    (fun s j => fiberParameter_height s j)
+     (fiberRows_height A anchor hB hA) (fun i => by
+       cases i with
+       | inl t => exact hb t
+--- a/OAI/Optimization/LinearProgramming/Compression/PinnedPoint.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/PinnedPoint.lean
+@@ -0,0 +1,388 @@
++import OAI.Optimization.LinearProgramming.Compression.ProjectionSmallPoint
++import OAI.Optimization.LinearProgramming.Compression.AffineValue
++import OAI.Optimization.LinearProgramming.Compression.Fiber
++
++/-! # A common denominator for the point of the pinned clipping system
++
++This file is an addition to the upstream development. It repeats the tight-rank and
++Cramer argument of `ProjectionCramer` / `ProjectionSmallPoint` for the system that
++pins the committed generator coordinates, with three refinements.
++
++* The committed coordinates are integers `z j` over one positive integer `q` (they are
++  produced by normalizing an integer vector by its last coordinate). The pin rows
++  `y (anchor j) = z j / q` are therefore not cleared at all: the system is solved for
++  `q • y`, whose right-hand side is integral.
++* Only the right-hand side then carries the commitment height `G`. Expanding Cramer's
++  numerators along the replaced column (through the adjugate), the determinants are
++  bounded by `(s + 1)! * (B ^ (s + 2)) ^ (s + 1) * G`: the commitment height enters
++  once, where the upstream bound `s! * ((B + G + 1) ^ (s + 2)) ^ s` has it to the power
++  `s * (s + 2)`.
++* Cramer's rule gives all coordinates over the one denominator `q * det`. An affine form
++  evaluated at such a point has height `(s + 1) * (C + 1) ^ (s + 2) * Y` instead of
++  `(s + 1) * ((C + 1) * (Y + 1)) ^ (s + 2)`: the height `Y` of the point enters once, not
++  once for every coordinate.
++-/
++
++namespace OAI
++namespace Optimization
++namespace LinearProgramming
++namespace Compression
++
++open scoped BigOperators Matrix
++
++/-- A rational row `v` with constant `c` has a positive integer multiple whose entries
++are integers of magnitude at most `T`, and whose constant becomes an integer of
++magnitude at most `T'` after multiplication by the common denominator `q`. -/
++def RowClears {ι : Type*} (T T' : ℕ) (q : ℤ) (v : ι → ℚ) (c : ℚ) : Prop :=
++  ∃ (D : ℕ) (a : ι → ℤ) (R : ℤ), 0 < D ∧
++    (∀ j, (a j : ℚ) = (D : ℚ) * v j ∧ (a j).natAbs ≤ T) ∧
++    (R : ℚ) = (D : ℚ) * c * (q : ℚ) ∧ R.natAbs ≤ T'
++
++theorem RowClears.mono {ι : Type*} {T₁ T₂ T₁' T₂' : ℕ} {q : ℤ} {v : ι → ℚ} {c : ℚ}
++    (h : RowClears T₁ T₁' q v c) (hT : T₁ ≤ T₂) (hT' : T₁' ≤ T₂') : RowClears T₂ T₂' q v c := by
++  obtain ⟨D, a, R, hD, ha, hR, hb⟩ := h
++  exact ⟨D, a, R, hD, fun j => ⟨(ha j).1, (ha j).2.trans hT⟩, hR, hb.trans hT'⟩
++
++/-- A row of height `B` in `card ι` variables clears to height `B ^ (card ι + 2)`; its
++constant picks up the factor `q`. -/
++theorem rowClears_of_height {ι : Type*} [Fintype ι] (v : ι → ℚ) (c : ℚ) {B G : ℕ} (q : ℤ)
++    (hv : ∀ j, (v j).num.natAbs ≤ B ∧ (v j).den ≤ B) (hc : c.num.natAbs ≤ B ∧ c.den ≤ B)
++    (hq : q.natAbs ≤ G) :
++    RowClears (B ^ (Fintype.card ι + 2)) (B ^ (Fintype.card ι + 2) * G) q v c := by
++  classical
++  let row : Option ι → ℚ := fun j => j.elim c v
++  have hrow (j : Option ι) : (row j).num.natAbs ≤ B ∧ (row j).den ≤ B := by
++    cases j with
++    | none => exact hc
++    | some k => exact hv k
++  obtain ⟨D, a, hD, _, ha⟩ :=
++    clear_bounded_row row (fun j => (hrow j).1) (fun j => (hrow j).2)
++  have h₀ : (a none).natAbs ≤ B ^ (Fintype.card ι + 2) := by
++    simpa only [Fintype.card_option, Nat.add_assoc] using (ha none).2
++  refine ⟨D, fun j => a (some j), a none * q, hD, fun j => ⟨(ha (some j)).1, ?_⟩, ?_, ?_⟩
++  · simpa only [Fintype.card_option, Nat.add_assoc] using (ha (some j)).2
++  · rw [Int.cast_mul, (ha none).1]
++    rfl
++  · rw [Int.natAbs_mul]
++    exact Nat.mul_le_mul h₀ hq
++
++/-- A row with coefficients `0, ±1` whose constant is an integer over `q` needs no
++clearing. -/
++theorem rowClears_of_unit {ι : Type*} (v : ι → ℚ) (c : ℚ) {G : ℕ} (q z : ℤ) (hq : q ≠ 0)
++    (hv : ∀ j, (v j).num.natAbs ≤ 1 ∧ (v j).den ≤ 1) (hc : c = (z : ℚ) / (q : ℚ))
++    (hz : z.natAbs ≤ G) : RowClears 1 G q v c := by
++  have hqq : (q : ℚ) ≠ 0 := by exact_mod_cast hq
++  refine ⟨1, fun j => (v j).num, z, Nat.one_pos, fun j => ⟨?_, (hv j).1⟩, ?_, hz⟩
++  · have hden : (v j).den = 1 := le_antisymm (hv j).2 (v j).den_pos
++    rw [(Rat.den_eq_one_iff _).mp hden, Nat.cast_one, one_mul]
++  · rw [hc, Nat.cast_one, one_mul, div_mul_cancel₀ _ hqq]
++
++/-- The determinant with one column replaced by a vector of a different height: the
++expansion along that column (through the adjugate) is linear in the new height. -/
++theorem det_updateCol_natAbs_le {ι : Type*} [Fintype ι] [DecidableEq ι] (A : Matrix ι ι ℤ)
++    (b : ι → ℤ) {B B' : ℕ} (hB : 1 ≤ B) (hA : ∀ i j, (A i j).natAbs ≤ B)
++    (hb : ∀ i, (b i).natAbs ≤ B') (i : ι) :
++    (A.updateCol i b).det.natAbs ≤
++      Fintype.card ι * ((Fintype.card ι).factorial * B ^ Fintype.card ι * B') := by
++  have hadj (j : ι) :
++      (A.adjugate i j).natAbs ≤ (Fintype.card ι).factorial * B ^ Fintype.card ι := by
++    rw [Matrix.adjugate_apply]
++    apply det_natAbs_le_factorial_mul_pow
++    intro k l
++    rw [Matrix.updateRow_apply]
++    split_ifs
++    · rw [Pi.single_apply]
++      split_ifs
++      · simpa using hB
++      · simp
++    · exact hA k l
++  have hdet : (A.updateCol i b).det = ∑ j, A.adjugate i j * b j := by
++    rw [← Matrix.cramer_apply, Matrix.cramer_eq_adjugate_mulVec]
++    rfl
++  rw [hdet]
++  calc
++    _ ≤ ∑ j, (A.adjugate i j * b j).natAbs := Int.natAbs_sum_le _ _
++    _ ≤ ∑ _j : ι, (Fintype.card ι).factorial * B ^ Fintype.card ι * B' :=
++      Finset.sum_le_sum fun j _ => by
++        rw [Int.natAbs_mul]
++        exact Nat.mul_le_mul (hadj j) (hb j)
++    _ = _ := by simp
++
++/-- Cramer's rule for a nonsingular square system whose rows clear to height `T` with
++constants of height `T'` over the common denominator `q`: every solution over a
++characteristic-zero field has integer numerators over one integer denominator. -/
++theorem exists_common_denominator_of_tight_system {ι K : Type*} [Fintype ι] [DecidableEq ι]
++    [Field K] [CharZero K] (A : Matrix ι ι ℚ) (b : ι → ℚ) {T T' : ℕ} (hT : 1 ≤ T) (q : ℤ)
++    (hq : q ≠ 0) (hrow : ∀ i, RowClears T T' q (A i) (b i)) (hdet : A.det ≠ 0) (x : ι → K)
++    (hx : (A.map (fun z : ℚ => (z : K))) *ᵥ x = fun i => (b i : K)) :
++    ∃ (Q : ℤ) (n : ι → ℤ), Q ≠ 0 ∧
++      Q.natAbs ≤ q.natAbs * ((Fintype.card ι).factorial * T ^ Fintype.card ι) ∧
++      (∀ i, (n i).natAbs ≤
++        Fintype.card ι * ((Fintype.card ι).factorial * T ^ Fintype.card ι * T')) ∧
++      ∀ i, x i = (n i : K) / (Q : K) := by
++  have hrow' : ∀ i, ∃ (D : ℕ) (a : ι → ℤ) (R : ℤ), 0 < D ∧
++      (∀ j, (a j : ℚ) = (D : ℚ) * A i j ∧ (a j).natAbs ≤ T) ∧
++      (R : ℚ) = (D : ℚ) * b i * (q : ℚ) ∧ R.natAbs ≤ T' := hrow
++  choose D a R hD ha hR hRT using hrow'
++  let C : Matrix ι ι ℤ := fun i j => a i j
++  have hqK : (q : K) ≠ 0 := by exact_mod_cast hq
++  have hcq (i j : ι) : (C i j : ℚ) = (D i : ℚ) * A i j := (ha i j).1
++  have hcast : C.map (fun z : ℤ => (z : ℚ)) = Matrix.diagonal (fun i => (D i : ℚ)) * A := by
++    ext i j; rw [Matrix.diagonal_mul]; exact hcq i j
++  have hCdet : C.det ≠ 0 := by
++    intro hz
++    have hzq : (C.det : ℚ) = 0 := by exact_mod_cast hz
++    rw [Int.cast_det, hcast, Matrix.det_mul, Matrix.det_diagonal] at hzq
++    exact (mul_ne_zero (Finset.prod_ne_zero_iff.mpr
++      (fun i _ => by exact_mod_cast (hD i).ne')) hdet) hzq
++  have hcK (i j : ι) : (C i j : K) = (D i : K) * (A i j : K) := by
++    simpa only [Rat.cast_mul, Rat.cast_intCast, Rat.cast_natCast] using
++      congrArg (fun r : ℚ => (r : K)) (hcq i j)
++  have hRK (i : ι) : (R i : K) = (D i : K) * (b i : K) * (q : K) := by
++    simpa only [Rat.cast_mul, Rat.cast_intCast, Rat.cast_natCast] using
++      congrArg (fun r : ℚ => (r : K)) (hR i)
++  have hxC : (C.map (fun z : ℤ => (z : K))) *ᵥ (fun j => (q : K) * x j) =
++      (fun i => (R i : K)) := by
++    ext i
++    have hxi := congrFun hx i
++    change (∑ j, (A i j : K) * x j) = (b i : K) at hxi
++    change (∑ j, (C i j : K) * ((q : K) * x j)) = (R i : K)
++    have hterm (j : ι) : (C i j : K) * ((q : K) * x j) =
++        (D i : K) * (q : K) * ((A i j : K) * x j) := by
++      rw [hcK]; ring
++    simp_rw [hterm]
++    rw [← Finset.mul_sum, hxi, hRK]
++    ring
++  refine ⟨q * C.det, fun i => (C.updateCol i R).det, mul_ne_zero hq hCdet, ?_,
++    fun i => det_updateCol_natAbs_le C R hT (fun i j => (ha i j).2) hRT i, fun i => ?_⟩
++  · rw [Int.natAbs_mul]
++    exact Nat.mul_le_mul_left _ (det_natAbs_le_factorial_mul_pow C (fun i j => (ha i j).2))
++  · have h := cramer_coordinate C R (fun j => (q : K) * x j) hCdet hxC i
++    have hCK : (C.det : K) ≠ 0 := by exact_mod_cast hCdet
++    rw [Int.cast_mul, eq_div_iff (mul_ne_zero hqK hCK)]
++    have h' := (eq_div_iff hCK).mp h
++    rw [← h']
++    ring
++
++/-- A nonempty rational polyhedron whose rows clear over the common denominator `q`
++contains a rational point with one common denominator. The bound uses only the number
++of variables. -/
++theorem exists_common_denominator_feasible
++    {K ι κ : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
++    [Fintype ι] [Fintype κ] [DecidableEq κ]
++    (A : Matrix ι κ ℚ) (b : ι → ℚ) {T T' : ℕ} (hT : 1 ≤ T) (q : ℤ) (hq : q ≠ 0)
++    (hrow : ∀ i, RowClears T T' q (A i) (b i))
++    (hne : ∃ x : κ → K, (A.map (fun z : ℚ => (z : K))) *ᵥ x ≤ fun i => (b i : K)) :
++    ∃ (Q : ℤ) (n : κ → ℤ), Q ≠ 0 ∧
++      Q.natAbs ≤ q.natAbs * ((Fintype.card κ).factorial * T ^ Fintype.card κ) ∧
++      (∀ j, (n j).natAbs ≤
++        Fintype.card κ * ((Fintype.card κ).factorial * T ^ Fintype.card κ * T')) ∧
++      A *ᵥ (fun j => (n j : ℚ) / (Q : ℚ)) ≤ b := by
++  classical
++  let A' := A.map (fun z : ℚ => (z : K))
++  obtain ⟨p, x, hx, sel, _, hdet, ht⟩ := exists_orthant_tight_submatrix A' _ hne
++  let M := (orthantCutRows A p).submatrix sel id
++  let r : κ → ℚ := fun j => (sel j).elim b (fun _ => 0)
++  have hC : M.map (fun z : ℚ => (z : K)) = (orthantCutRows A' p).submatrix sel id := by
++    ext i j
++    cases hi : sel i with
++    | inl k => simp [M, orthantCutRows, hi, A']
++    | inr k =>
++      by_cases hj : j = k <;> cases hp : p k <;> simp [M, orthantCutRows, hi, hj, hp]
++  have hMr : ∀ i, RowClears T T' q (M i) (r i) := by
++    intro i
++    cases hi : sel i with
++    | inl k =>
++      have h₁ : M i = A k := by
++        funext j
++        simp [M, orthantCutRows, hi]
++      have h₂ : r i = b k := by simp [r, hi]
++      rw [h₁, h₂]
++      exact hrow k
++    | inr k =>
++      have h₂ : r i = 0 := by simp [r, hi]
++      rw [h₂]
++      refine (rowClears_of_unit (G := 0) _ _ q 0 hq ?_ (by simp) (by simp)).mono hT
++        (Nat.zero_le _)
++      intro j
++      by_cases hj : j = k <;> cases hp : p k <;> simp [M, orthantCutRows, hi, hj, hp]
++  have hdetQ : M.det ≠ 0 := by
++    intro hz
++    apply hdet
++    rw [← hC, ← Rat.cast_det, hz, Rat.cast_zero]
++  have hMx : (M.map (fun z : ℚ => (z : K))) *ᵥ x = fun j => (r j : K) := by
++    rw [hC]
++    funext i
++    change (orthantCutRows A' p *ᵥ x) (sel i) = (r i : K)
++    rw [ht i]
++    cases hi : sel i <;> simp [r, hi]
++  obtain ⟨Q, n, hQ, hQb, hnb, hxn⟩ :=
++    exists_common_denominator_of_tight_system M r hT q hq hMr hdetQ x hMx
++  refine ⟨Q, n, hQ, hQb, hnb, ?_⟩
++  let y : κ → ℚ := fun j => (n j : ℚ) / (Q : ℚ)
++  have hyx : (fun j => (y j : K)) = x := funext fun j => by
++    simp only [y, Rat.cast_div, Rat.cast_intCast]
++    exact (hxn j).symm
++  intro i
++  have hyi : ((A *ᵥ y) i : K) ≤ (b i : K) := by
++    calc
++      ((A *ᵥ y) i : K) = (A' *ᵥ x) i := by
++        rw [← hyx]
++        change ((∑ j, A i j * y j : ℚ) : K) = ∑ j, (A i j : K) * (y j : K)
++        push_cast; rfl
++      _ ≤ _ := hx i
++  have hfin : (A *ᵥ y) i ≤ b i := by exact_mod_cast hyi
++  exact hfin
++
++/-- The common-denominator point can be required to extend predetermined coordinates
++that are integers `z i` over one positive integer `q`, all of magnitude at most `G`.
++The height `G` enters the bound linearly. -/
++theorem exists_common_denominator_feasible_with_fixed {ι κ σ : Type*}
++    [Fintype ι] [Fintype κ] [DecidableEq κ] [Fintype σ]
++    (A : Matrix ι κ ℚ) (b : ι → ℚ) (idx : σ → κ) (g : σ → ℚ) (q : ℤ) (z : σ → ℤ)
++    {B G : ℕ} (hB : 1 ≤ B)
++    (hA : ∀ i j, (A i j).num.natAbs ≤ B ∧ (A i j).den ≤ B)
++    (hb : ∀ i, (b i).num.natAbs ≤ B ∧ (b i).den ≤ B)
++    (hq : 0 < q) (hqG : q.natAbs ≤ G) (hzG : ∀ i, (z i).natAbs ≤ G)
++    (hg : ∀ i, g i = (z i : ℚ) / (q : ℚ))
++    (hne : ∃ x : κ → ℝ, A.map (Rat.cast : ℚ → ℝ) *ᵥ x ≤ (fun i => (b i : ℝ)) ∧
++      ∀ i, x (idx i) = (g i : ℝ)) :
++    ∃ (Q : ℤ) (n : κ → ℤ), Q ≠ 0 ∧
++      Q.natAbs ≤ (Fintype.card κ + 1).factorial *
++        (B ^ (Fintype.card κ + 2)) ^ (Fintype.card κ + 1) * G ∧
++      (∀ j, (n j).natAbs ≤ (Fintype.card κ + 1).factorial *
++        (B ^ (Fintype.card κ + 2)) ^ (Fintype.card κ + 1) * G) ∧
++      A *ᵥ (fun j => (n j : ℚ) / (Q : ℚ)) ≤ b ∧
++      ∀ i, (n (idx i) : ℚ) / (Q : ℚ) = g i := by
++  classical
++  let s := Fintype.card κ
++  let T := B ^ (s + 2)
++  have hT : 1 ≤ T := Nat.one_le_pow _ _ hB
++  have hGT : G ≤ T * G := Nat.le_mul_of_pos_left _ hT
++  let M := fiberRows A idx
++  let r := fiberRhs b g
++  have hrow : ∀ t, RowClears T (T * G) q (M t) (r t) := by
++    rintro (i | ⟨i, sgn⟩)
++    · exact rowClears_of_height (A i) (b i) q (hA i) (hb i) hqG
++    · cases sgn
++      · refine (rowClears_of_unit _ _ q (-z i) hq.ne' ?_ ?_ ?_).mono hT hGT
++        · intro j
++          by_cases hj : j = idx i <;> simp [M, fiberRows, hj]
++        · simp [r, fiberRhs, hg i, neg_div]
++        · simpa using hzG i
++      · refine (rowClears_of_unit _ _ q (z i) hq.ne' ?_ ?_ (hzG i)).mono hT hGT
++        · intro j
++          by_cases hj : j = idx i <;> simp [M, fiberRows, hj]
++        · simp [r, fiberRhs, hg i]
++  obtain ⟨x, hx, hfixed⟩ := hne
++  have hne' : ∃ y : κ → ℝ, M.map (fun z : ℚ => (z : ℝ)) *ᵥ y ≤ fun t => (r t : ℝ) := by
++    refine ⟨x, ?_⟩
++    have hM : M.map (fun z : ℚ => (z : ℝ)) = fiberRows (A.map (Rat.cast : ℚ → ℝ)) idx :=
++      fiberRows_cast_real A idx
++    have hr : (fun t => (r t : ℝ)) = fiberRhs (fun i => (b i : ℝ)) (fun j => (g j : ℝ)) :=
++      funext (fiberRhs_cast_real b g)
++    rw [hM, hr]
++    exact (fiberRows_mulVec_le_iff _ _ idx _ x).mpr ⟨hx, hfixed⟩
++  obtain ⟨Q, n, hQ, hQb, hnb, hy⟩ :=
++    exists_common_denominator_feasible M r hT q hq.ne' hrow hne'
++  obtain ⟨hineq, hpins⟩ := (fiberRows_mulVec_le_iff A b idx g _).mp hy
++  have hfac : (s + 1).factorial = (s + 1) * s.factorial := Nat.factorial_succ s
++  have hpow : T ^ (s + 1) = T ^ s * T := pow_succ T s
++  have hTs : 0 < T ^ s := Nat.pow_pos hT
++  have hcapQ : q.natAbs * (s.factorial * T ^ s) ≤ (s + 1).factorial * T ^ (s + 1) * G := by
++    calc
++      q.natAbs * (s.factorial * T ^ s) ≤ G * (s.factorial * T ^ s) :=
++        Nat.mul_le_mul_right _ hqG
++      _ ≤ G * (((s + 1) * s.factorial) * (T ^ s * T)) :=
++        Nat.mul_le_mul_left _ (Nat.mul_le_mul (Nat.le_mul_of_pos_left _ (Nat.succ_pos s))
++          (Nat.le_mul_of_pos_right _ hT))
++      _ = _ := by rw [hfac, hpow, Nat.mul_comm]
++  have hcapn : s * (s.factorial * T ^ s * (T * G)) ≤ (s + 1).factorial * T ^ (s + 1) * G := by
++    calc
++      s * (s.factorial * T ^ s * (T * G)) ≤ (s + 1) * (s.factorial * T ^ s * (T * G)) :=
++        Nat.mul_le_mul_right _ (Nat.le_succ s)
++      _ = _ := by rw [hfac, hpow]; ring
++  exact ⟨Q, n, hQ, hQb.trans hcapQ, fun j => (hnb j).trans hcapn, hineq, hpins⟩
++
++/-- An affine form evaluated at a point with one common denominator. The height `Y` of
++the point enters linearly; only the coefficient heights are raised to the dimension. -/
++theorem affine_evalRat_common_height {ι κ : Type*} [Fintype κ] (F : AffineFamily ι κ)
++    (u : ι) (s C Y : ℕ) (hs : Fintype.card κ ≤ s)
++    (hc : ∀ j, (F.coefficient u j).num.natAbs ≤ C ∧ (F.coefficient u j).den ≤ C)
++    (ho : (F.offset u).num.natAbs ≤ C ∧ (F.offset u).den ≤ C)
++    (Q : ℤ) (n : κ → ℤ) (hQ : Q ≠ 0) (hQY : Q.natAbs ≤ Y) (hn : ∀ j, (n j).natAbs ≤ Y) :
++    (F.evalRat (fun j => (n j : ℚ) / (Q : ℚ)) u).num.natAbs ≤
++        (s + 1) * (C + 1) ^ (s + 2) * Y ∧
++      (F.evalRat (fun j => (n j : ℚ) / (Q : ℚ)) u).den ≤ (s + 1) * (C + 1) ^ (s + 2) * Y := by
++  classical
++  let row : Option κ → ℚ := fun j => j.elim (F.offset u) (F.coefficient u)
++  have hrow (j : Option κ) : (row j).num.natAbs ≤ C ∧ (row j).den ≤ C := by
++    cases j with
++    | none => exact ho
++    | some j => exact hc j
++  obtain ⟨D, c, hD, hDB, hcl⟩ :=
++    clear_bounded_row row (fun j => (hrow j).1) (fun j => (hrow j).2)
++  let k := Fintype.card κ
++  have hC1 : 1 ≤ C := (F.offset u).den_pos.trans_le ho.2
++  have hDT : D ≤ C ^ (k + 2) := by
++    rw [Fintype.card_option] at hDB
++    exact hDB.trans (Nat.pow_le_pow_right hC1 (Nat.le_succ _))
++  let a : κ → ℤ := fun j => c (some j)
++  let a₀ : ℤ := c none
++  have ha (j : κ) : (a j : ℚ) = (D : ℚ) * F.coefficient u j ∧ (a j).natAbs ≤ C ^ (k + 2) :=
++    ⟨(hcl (some j)).1,
++      by simpa only [Fintype.card_option, Nat.add_assoc] using (hcl (some j)).2⟩
++  have h₀ : (a₀ : ℚ) = (D : ℚ) * F.offset u := (hcl none).1
++  have hb₀ : a₀.natAbs ≤ C ^ (k + 2) := by
++    simpa only [Fintype.card_option, Nat.add_assoc] using (hcl none).2
++  let P : ℤ := a₀ * Q + ∑ j, a j * n j
++  have hQq : (Q : ℚ) ≠ 0 := by exact_mod_cast hQ
++  have hDq : (D : ℚ) ≠ 0 := by exact_mod_cast hD.ne'
++  have hDQ : (D : ℤ) * Q ≠ 0 := mul_ne_zero (by exact_mod_cast hD.ne') hQ
++  have hsum : (∑ j, F.coefficient u j * ((n j : ℚ) / (Q : ℚ))) * ((D : ℚ) * (Q : ℚ)) =
++      ∑ j, (a j : ℚ) * (n j : ℚ) := by
++    rw [Finset.sum_mul]
++    refine Finset.sum_congr rfl fun j _ => ?_
++    rw [(ha j).1]
++    field_simp
++  have heq : F.evalRat (fun j => (n j : ℚ) / (Q : ℚ)) u =
++      (P : ℚ) / (((D : ℤ) * Q : ℤ) : ℚ) := by
++    rw [eq_div_iff (by exact_mod_cast hDQ)]
++    simp only [AffineFamily.evalRat, P]
++    push_cast
++    rw [add_mul, hsum, h₀]
++    ring
++  have hpow : C ^ (k + 2) ≤ (C + 1) ^ (s + 2) :=
++    (Nat.pow_le_pow_left (Nat.le_succ C) _).trans
++      (Nat.pow_le_pow_right (Nat.succ_pos C) (Nat.add_le_add_right hs 2))
++  have hP : P.natAbs ≤ (k + 1) * (C ^ (k + 2) * Y) := by
++    calc
++      P.natAbs ≤ (a₀ * Q).natAbs + (∑ j, a j * n j).natAbs := Int.natAbs_add_le _ _
++      _ ≤ C ^ (k + 2) * Y + ∑ _j : κ, C ^ (k + 2) * Y := by
++        apply Nat.add_le_add
++        · rw [Int.natAbs_mul]
++          exact Nat.mul_le_mul hb₀ hQY
++        · apply (Int.natAbs_sum_le _ _).trans
++          apply Finset.sum_le_sum
++          intro j _
++          rw [Int.natAbs_mul]
++          exact Nat.mul_le_mul (ha j).2 (hn j)
++      _ = (k + 1) * (C ^ (k + 2) * Y) := by
++        simp only [Finset.sum_const, Finset.card_univ, smul_eq_mul, k]
++        ring
++  have hcap : (k + 1) * (C ^ (k + 2) * Y) ≤ (s + 1) * (C + 1) ^ (s + 2) * Y := by
++    rw [Nat.mul_assoc]
++    exact Nat.mul_le_mul (Nat.add_le_add_right hs 1) (Nat.mul_le_mul_right _ hpow)
++  have hred := reduced_fraction_height P ((D : ℤ) * Q) hDQ
++  rw [heq]
++  refine ⟨hred.1.trans (hP.trans hcap), hred.2.trans ?_⟩
++  rw [Int.natAbs_mul, Int.natAbs_natCast]
++  calc
++    D * Q.natAbs ≤ C ^ (k + 2) * Y := Nat.mul_le_mul hDT hQY
++    _ ≤ (k + 1) * (C ^ (k + 2) * Y) := Nat.le_mul_of_pos_left _ (Nat.succ_pos k)
++    _ ≤ _ := hcap
++
++end Compression
++end LinearProgramming
++end Optimization
++end OAI
+--- a/OAI/Optimization/LinearProgramming/Compression/Projection.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/Projection.lean
+@@ -80,14 +80,16 @@
+   rwa [hg, hb, ← mulVec_mulVec]
+ 
+ /-- Determinant bounds for an injective rectangular system, without a minor selection.
+-All coordinates have one positive denominator and uniformly bounded numerators. -/
++All coordinates have one positive denominator and uniformly bounded numerators.
++The denominator is the absolute value of the Gram determinant (rather than its square),
++so the bound is the Gram determinant bound `T` itself. -/
+ theorem exists_bounded_scaled_integer_solution (A : Matrix ι ν ℤ) (b : ι → ℤ)
+     (z : ν → ℝ) (hcol : LinearIndependent ℝ (A.map (Int.cast : ℤ → ℝ)).col)
+     (hz : (A.map (Int.cast : ℤ → ℝ)) *ᵥ z = (fun j => (b j : ℝ)))
+     {B : ℕ} (hA : ∀ i j, (A i j).natAbs ≤ B) (hb : ∀ i, (b i).natAbs ≤ B) :
+     let T := (Fintype.card ν).factorial * (Fintype.card ι * B ^ 2) ^ Fintype.card ν
+-    ∃ (q : ℤ) (w : ν → ℤ), 0 < q ∧ q.natAbs ≤ T^2 ∧
+-      (∀ i, (w i).natAbs ≤ T^2) ∧ ∀ i, (w i : ℝ) = (q : ℝ) * z i := by
++    ∃ (q : ℤ) (w : ν → ℤ), 0 < q ∧ q.natAbs ≤ T ∧
++      (∀ i, (w i).natAbs ≤ T) ∧ ∀ i, (w i : ℝ) = (q : ℝ) * z i := by
+   classical
+   let G : Matrix ν ν ℤ := Aᵀ * A
+   let c : ν → ℤ := Aᵀ *ᵥ b
+@@ -120,17 +122,22 @@
+         by_cases h : k = i
+         · subst k; simpa using hcB j
+         · simpa [Matrix.updateCol_ne h] using hgB j k)
+-  refine ⟨G.det * G.det, fun i => G.det * (G.updateCol i c).det,
+-    mul_self_pos.mpr hdet, ?_, ?_, ?_⟩
+-  · simpa [Int.natAbs_mul, pow_two] using Nat.mul_le_mul hD hD
++  refine ⟨|G.det|, fun i => G.det.sign * (G.updateCol i c).det,
++    abs_pos.mpr hdet, ?_, ?_, ?_⟩
++  · rw [Int.natAbs_abs]
++    exact hD
+   · intro i
+-    simpa [Int.natAbs_mul, pow_two] using Nat.mul_le_mul hD (hN i)
++    rw [Int.natAbs_mul, Int.natAbs_sign_of_ne_zero hdet, one_mul]
++    exact hN i
+   · intro i
+     have h := cramer_coordinate G c z hdet (integer_gram_equations A b z hz) i
+     have he := (eq_div_iff (Int.cast_ne_zero.mpr hdet)).mp h
+-    simp only [Int.cast_mul]
+-    rw [← he]
+-    ring
++    calc
++      ((G.det.sign * (G.updateCol i c).det : ℤ) : ℝ) =
++          ((G.det.sign * G.det : ℤ) : ℝ) * z i := by
++        rw [Int.cast_mul, Int.cast_mul, ← he]
++        ring
++      _ = _ := by rw [Int.sign_mul_self_eq_abs]
+ 
+ end IntegerGram
+ 
+@@ -141,7 +148,7 @@
+ /-- A uniform bound for each nonnegative integer multiplier needed to eliminate d hidden
+ variables from a system with integral coefficients of magnitude at most B. -/
+ def projectionMultiplierBound (d B : ℕ) : ℕ :=
+-  ((d+1).factorial * ((d+1) * max 1 B ^ 2)^(d+1))^2
++  (d+1).factorial * ((d+1) * max 1 B ^ 2)^(d+1)
+ 
+ /-- Every violated projected cut has a certificate supported on at most d+1 original rows.
+ Its integer weights are bounded independently of the number of original constraints or the
+--- a/OAI/Optimization/LinearProgramming/Compression/ProjectionCuts.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ProjectionCuts.lean
+@@ -35,14 +35,16 @@
+     calc
+       _ ≤ 2^(n*n) * (2^(n+2*L))^n := Nat.mul_le_mul hf (Nat.pow_le_pow_left hinner n)
+       _ = _ := by rw [← pow_mul, ← pow_add, pow_two]
+-  change n * ((n.factorial * (n * max 1 B ^ 2) ^ n)^2 * B) ≤ _
++  change n * ((n.factorial * (n * max 1 B ^ 2) ^ n) * B) ≤ _
+   calc
+-    _ ≤ 2^n * ((2^(n^2+(n+2*L)*n))^2 * 2^L) :=
+-      Nat.mul_le_mul hn (Nat.mul_le_mul (Nat.pow_le_pow_left hT 2) hB)
+-    _ = 2^(n + 2*(n^2+(n+2*L)*n) + L) := by
+-      rw [← pow_mul, ← pow_add, ← pow_add]
++    _ ≤ 2^n * (2^(n^2+(n+2*L)*n) * 2^L) :=
++      Nat.mul_le_mul hn (Nat.mul_le_mul hT hB)
++    _ = 2^(n + (n^2+(n+2*L)*n) + L) := by
++      rw [← pow_add, ← pow_add]
+       congr 1
+       omega
++    _ ≤ 2^(n + 2*(n^2+(n+2*L)*n) + L) :=
++      Nat.pow_le_pow_right (by decide) (by omega)
+ 
+ private theorem weighted_height {σ : Type*} [Fintype σ] (p a : σ → ℤ) {P B : ℕ}
+     (hp : ∀ i, (p i).natAbs ≤ P) (ha : ∀ i, (a i).natAbs ≤ B) :
+--- a/OAI/Optimization/LinearProgramming/Compression/ProjectionRational.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ProjectionRational.lean
+@@ -18,6 +18,11 @@
+ /-- A height for integer entries obtained by clearing one rational block row. -/
+ def clearedProjectionRowBound (k d B : ℕ) : ℕ := B ^ (k + d + 2)
+ 
++/-- The same height when the retained columns are already integral with entries `0, ±1`:
++only the `d` eliminated columns and the constant carry denominators, so the number of
++retained columns does not enter. -/
++def fiberClearedRowBound (d B : ℕ) : ℕ := B ^ (d + 2)
++
+ /-- An exponent bounding the height of projected tests. Here `L` bounds the
+ bits of each reduced numerator and denominator before row clearing. -/
+ def projectionTestBitBound (k d L : ℕ) : ℕ :=
+@@ -25,17 +30,18 @@
+   let u := L * (k + d + 2)
+   n + ((n * n + (n + u * 2) * n) * 2 + u)
+ 
+-/-- The bounded affine tests used for a projection have polynomially many bits
+-even when the original system has exponentially many inequalities. -/
+-theorem projection_test_height_le_pow (k d B L : ℕ) (hB : B ≤ 2 ^ L) :
+-    projectionCoefficientBound d (clearedProjectionRowBound k d B) ≤
+-      2 ^ projectionTestBitBound k d L := by
++/-- The exponent for projected tests of a system whose retained columns are integral.
++The multiplier bound enters once, and the rows are cleared over `d + 2` entries only. -/
++def fiberTestBitBound (d L : ℕ) : ℕ :=
+   let n := d + 1
+-  let u := L * (k + d + 2)
+-  let C := clearedProjectionRowBound k d B
+-  have hC : C ≤ 2 ^ u := by
+-    apply (Nat.pow_le_pow_left hB (k + d + 2)).trans_eq
+-    exact (pow_mul 2 L (k + d + 2)).symm
++  let u := L * (d + 2)
++  n + ((n * n + (n + u * 2) * n) + u)
++
++/-- Projected cuts of integer rows of height at most `2 ^ u`. -/
++theorem projectionCoefficientBound_le_two_pow (d C u : ℕ) (hC : C ≤ 2 ^ u) :
++    projectionCoefficientBound d C ≤
++      2 ^ ((d + 1) + (((d + 1) * (d + 1) + ((d + 1) + u * 2) * (d + 1)) + u)) := by
++  let n := d + 1
+   have hn : n ≤ 2 ^ n := n.lt_two_pow_self.le
+   have hf : n.factorial ≤ 2 ^ (n * n) :=
+     n.factorial_le_pow.trans <| (Nat.pow_le_pow_left hn n).trans_eq (pow_mul 2 n n).symm
+@@ -46,12 +52,33 @@
+   have hmult : n.factorial * (n * max 1 C ^ 2) ^ n ≤ 2 ^ (n * n + (n + u * 2) * n) := by
+     rw [pow_add 2 (n * n) ((n + u * 2) * n), pow_mul 2 (n + u * 2) n]
+     exact Nat.mul_le_mul hf (Nat.pow_le_pow_left hbase n)
+-  change n * ((n.factorial * (n * max 1 C ^ 2) ^ n) ^ 2 * C) ≤
+-    2 ^ (n + ((n * n + (n + u * 2) * n) * 2 + u))
+-  rw [pow_add 2 n _, pow_add 2 ((n * n + (n + u * 2) * n) * 2) u,
+-    pow_mul 2 (n * n + (n + u * 2) * n) 2]
+-  exact Nat.mul_le_mul hn (Nat.mul_le_mul (Nat.pow_le_pow_left hmult 2) hC)
++  change n * ((n.factorial * (n * max 1 C ^ 2) ^ n) * C) ≤
++    2 ^ (n + ((n * n + (n + u * 2) * n) + u))
++  rw [pow_add 2 n _, pow_add 2 (n * n + (n + u * 2) * n) u]
++  exact Nat.mul_le_mul hn (Nat.mul_le_mul hmult hC)
+ 
++/-- The bounded affine tests used for a projection have polynomially many bits
++even when the original system has exponentially many inequalities. -/
++theorem projection_test_height_le_pow (k d B L : ℕ) (hB : B ≤ 2 ^ L) :
++    projectionCoefficientBound d (clearedProjectionRowBound k d B) ≤
++      2 ^ projectionTestBitBound k d L := by
++  have hC : clearedProjectionRowBound k d B ≤ 2 ^ (L * (k + d + 2)) := by
++    apply (Nat.pow_le_pow_left hB (k + d + 2)).trans_eq
++    exact (pow_mul 2 L (k + d + 2)).symm
++  apply (projectionCoefficientBound_le_two_pow d _ _ hC).trans
++  apply Nat.pow_le_pow_right (by decide)
++  unfold projectionTestBitBound
++  dsimp only
++  omega
++
++/-- The sharper exponent for the fiber system, whose retained columns are integral. -/
++theorem fiber_test_height_le_pow (d B L : ℕ) (hB : B ≤ 2 ^ L) :
++    projectionCoefficientBound d (fiberClearedRowBound d B) ≤ 2 ^ fiberTestBitBound d L := by
++  have hC : fiberClearedRowBound d B ≤ 2 ^ (L * (d + 2)) := by
++    apply (Nat.pow_le_pow_left hB (d + 2)).trans_eq
++    exact (pow_mul 2 L (d + 2)).symm
++  exact projectionCoefficientBound_le_two_pow d _ _ hC
++
+ private theorem sum_scaled_coefficients {j : Type*} [Fintype j] (q : j → ℚ) (a : j → ℤ)
+     (D : ℕ) (h : ∀ i, (a i : ℚ) = (D : ℚ) * q i) (v : j → ℝ) :
+     (∑ i, (a i : ℝ) * v i) = (D : ℝ) * ∑ i, (q i : ℝ) * v i := by
+@@ -160,6 +187,111 @@
+       (fun i => (c i : ℝ)) - G.map (Rat.cast : ℚ → ℝ) *ᵥ x' := by
+   obtain ⟨G', H', c', hGI, hHI, hcI, hequiv⟩ :=
+     integer_projection_presentation G H c hG hH hc
++  exact (hequiv x').mpr <| projection_of_preserving_affine_tests G' H' c' hGI hHI hcI
++    ((hequiv x).mp hx) tests
++
++/-- Row clearing when the retained columns are integral with entries `0, ±1`. Only the
++eliminated columns and the constant are cleared, and the retained columns are multiplied
++by the resulting denominator, so the retained dimension does not enter the height. -/
++theorem exists_integer_projection_system_of_unit (G : Matrix ι κ ℚ) (H : Matrix ι (Fin d) ℚ)
++    (c : ι → ℚ) {B : ℕ} (hB : 1 ≤ B)
++    (hG : ∀ i j, (G i j).num.natAbs ≤ 1 ∧ (G i j).den ≤ 1)
++    (hH : ∀ i j, (H i j).num.natAbs ≤ B ∧ (H i j).den ≤ B)
++    (hc : ∀ i, (c i).num.natAbs ≤ B ∧ (c i).den ≤ B) :
++    ∃ (G' : Matrix ι κ ℤ) (H' : Matrix ι (Fin d) ℤ) (c' : ι → ℤ),
++      (∀ i j, (G' i j).natAbs ≤ fiberClearedRowBound d B) ∧
++      (∀ i j, (H' i j).natAbs ≤ fiberClearedRowBound d B) ∧
++      (∀ i, (c' i).natAbs ≤ fiberClearedRowBound d B) ∧
++      ∀ (x : κ → ℝ) (y : Fin d → ℝ),
++        (H.map (Rat.cast : ℚ → ℝ) *ᵥ y ≤ (fun i => (c i : ℝ)) - G.map (Rat.cast : ℚ → ℝ) *ᵥ x) ↔
++        H'.map (Int.cast : ℤ → ℝ) *ᵥ y ≤ (fun i => (c' i : ℝ)) - G'.map (Int.cast : ℤ → ℝ) *ᵥ x := by
++  classical
++  let row (i : ι) : Option (Fin d) → ℚ := fun j => j.elim (c i) (H i)
++  have hrow (i : ι) (j : Option (Fin d)) :
++      (row i j).num.natAbs ≤ B ∧ (row i j).den ≤ B := by
++    obtain _ | j := j
++    · exact hc i
++    · exact hH i j
++  choose D a hD hDB ha using fun i =>
++    clear_bounded_row (row i) (fun j => (hrow i j).1) (fun j => (hrow i j).2)
++  let G' : Matrix ι κ ℤ := fun i j => (D i : ℤ) * (G i j).num
++  let H' : Matrix ι (Fin d) ℤ := fun i j => a i (some j)
++  let c' := fun i => a i none
++  have hGq (i : ι) (j : κ) : (G' i j : ℚ) = (D i : ℚ) * G i j := by
++    have hden : (G i j).den = 1 := le_antisymm (hG i j).2 (G i j).den_pos
++    have hnum : ((G i j).num : ℚ) = G i j := (Rat.den_eq_one_iff _).mp hden
++    simp only [G', Int.cast_mul, Int.cast_natCast, hnum]
++  have bound (i : ι) (j : Option (Fin d)) : (a i j).natAbs ≤ fiberClearedRowBound d B := by
++    simpa [fiberClearedRowBound, Nat.add_assoc] using (ha i j).2
++  have boundG (i : ι) (j : κ) : (G' i j).natAbs ≤ fiberClearedRowBound d B := by
++    have h1 : (G' i j).natAbs ≤ D i := by
++      simp only [G', Int.natAbs_mul, Int.natAbs_natCast]
++      exact (Nat.mul_le_mul_left _ (hG i j).1).trans_eq (Nat.mul_one _)
++    have h2 : D i ≤ B ^ (d + 1) := by simpa using hDB i
++    exact h1.trans (h2.trans (Nat.pow_le_pow_right hB (by omega)))
++  refine ⟨G', H', c', boundG, (fun i j => bound i (some j)), (fun i => bound i none), ?_⟩
++  intro x y
++  change (∀ i, (∑ j, (H i j : ℝ) * y j) ≤ (c i : ℝ) - ∑ j, (G i j : ℝ) * x j) ↔
++    ∀ i, (∑ j, (H' i j : ℝ) * y j) ≤ (c' i : ℝ) - ∑ j, (G' i j : ℝ) * x j
++  apply forall_congr'
++  intro i
++  have hG' := sum_scaled_coefficients (G i) (G' i) (D i) (fun j => hGq i j) x
++  have hH' := sum_scaled_coefficients (H i) (H' i) (D i) (fun j => (ha i (some j)).1) y
++  have hc' : (c' i : ℝ) = (D i : ℝ) * (c i : ℝ) := by
++    exact_mod_cast (show (c' i : ℚ) = (D i : ℚ) * c i from (ha i none).1)
++  rw [hG', hH', hc', ← mul_sub]
++  exact (mul_le_mul_iff_right₀ (show (0 : ℝ) < D i by exact_mod_cast hD i)).symm
++
++private theorem integer_projection_presentation_of_unit {ν : Type*} [Fintype ν]
++    (G : Matrix ι κ ℚ) (H : Matrix ι ν ℚ) (c : ι → ℚ) {B : ℕ} (hB : 1 ≤ B)
++    (hG : ∀ i j, (G i j).num.natAbs ≤ 1 ∧ (G i j).den ≤ 1)
++    (hH : ∀ i j, (H i j).num.natAbs ≤ B ∧ (H i j).den ≤ B)
++    (hc : ∀ i, (c i).num.natAbs ≤ B ∧ (c i).den ≤ B) :
++    ∃ (G' : Matrix ι κ ℤ) (H' : Matrix ι (Fin (Fintype.card ν)) ℤ) (c' : ι → ℤ),
++      (∀ i j, (G' i j).natAbs ≤ fiberClearedRowBound (Fintype.card ν) B) ∧
++      (∀ i j, (H' i j).natAbs ≤ fiberClearedRowBound (Fintype.card ν) B) ∧
++      (∀ i, (c' i).natAbs ≤ fiberClearedRowBound (Fintype.card ν) B) ∧
++      ∀ x : κ → ℝ, (∃ y, H.map (Rat.cast : ℚ → ℝ) *ᵥ y ≤
++          (fun i => (c i : ℝ)) - G.map (Rat.cast : ℚ → ℝ) *ᵥ x) ↔
++        ∃ y, H'.map (Int.cast : ℤ → ℝ) *ᵥ y ≤
++          (fun i => (c' i : ℝ)) - G'.map (Int.cast : ℤ → ℝ) *ᵥ x := by
++  classical
++  let e := Fintype.equivFin ν
++  let Hf : Matrix ι (Fin (Fintype.card ν)) ℚ := H.submatrix id e.symm
++  have remap (v : ν → ℝ) :
++      Hf.map (Rat.cast : ℚ → ℝ) *ᵥ (v ∘ e.symm) = H.map (Rat.cast : ℚ → ℝ) *ᵥ v := by
++    funext i
++    exact e.symm.sum_comp (fun j => (H i j : ℝ) * v j)
++  obtain ⟨G', H', c', hGI, hHI, hcI, hequiv⟩ :=
++    exists_integer_projection_system_of_unit G Hf c hB hG (fun i j => hH i (e.symm j)) hc
++  refine ⟨G', H', c', hGI, hHI, hcI, fun x => ⟨?_, ?_⟩⟩
++  · rintro ⟨y, hy⟩
++    exact ⟨y ∘ e.symm, (hequiv x (y ∘ e.symm)).mp ((remap y).symm ▸ hy)⟩
++  · rintro ⟨z, hz⟩
++    refine ⟨z ∘ e, ?_⟩
++    rw [← remap (z ∘ e)]
++    simpa [Function.comp_def] using (hequiv x z).mpr hz
++
++/-- The projection theorem for systems whose retained columns are integral with entries
++`0, ±1` (the fiber system of the committed generators): the tests that must be preserved
++have a height independent of the number of retained coordinates. -/
++theorem rational_projection_of_preserving_affine_tests_of_unit [Fintype ι] {ν : Type*}
++    [Fintype ν] (G : Matrix ι κ ℚ) (H : Matrix ι ν ℚ) (c : ι → ℚ) {B : ℕ} (hB : 1 ≤ B)
++    (hG : ∀ i j, (G i j).num.natAbs ≤ 1 ∧ (G i j).den ≤ 1)
++    (hH : ∀ i j, (H i j).num.natAbs ≤ B ∧ (H i j).den ≤ B)
++    (hc : ∀ i, (c i).num.natAbs ≤ B ∧ (c i).den ≤ B) {x x' : κ → ℝ}
++    (hx : ∃ y, H.map (Rat.cast : ℚ → ℝ) *ᵥ y ≤
++      (fun i => (c i : ℝ)) - G.map (Rat.cast : ℚ → ℝ) *ᵥ x)
++    (tests : ∀ (a : κ → ℤ) (b : ℤ), (∀ j, (a j).natAbs ≤
++        projectionCoefficientBound (Fintype.card ν)
++          (fiberClearedRowBound (Fintype.card ν) B)) →
++      b.natAbs ≤ projectionCoefficientBound (Fintype.card ν)
++        (fiberClearedRowBound (Fintype.card ν) B) →
++      (∑ j, (a j : ℝ) * x j) ≤ b → (∑ j, (a j : ℝ) * x' j) ≤ b) :
++    ∃ y, H.map (Rat.cast : ℚ → ℝ) *ᵥ y ≤
++      (fun i => (c i : ℝ)) - G.map (Rat.cast : ℚ → ℝ) *ᵥ x' := by
++  obtain ⟨G', H', c', hGI, hHI, hcI, hequiv⟩ :=
++    integer_projection_presentation_of_unit G H c hB hG hH hc
+   exact (hequiv x').mpr <| projection_of_preserving_affine_tests G' H' c' hGI hHI hcI
+     ((hequiv x).mp hx) tests
+ 
+--- a/OAI/Optimization/LinearProgramming/Compression/ProxyFuel.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/ProxyFuel.lean
+@@ -55,10 +55,26 @@
+ 
+ private theorem projectionInputBits_mono {i w L : ℕ} (hi : i ≤ w) :
+     fiberCommitInputBits i w L ≤ fiberCommitInputBits w w L := by
+-  unfold fiberCommitInputBits fiberProjectionBits projectionTestBitBound
++  unfold fiberCommitInputBits fiberProjectionBits fiberTestBitBound
+   dsimp only
+   gcongr
+ 
++/-- The exponent of the sign-form budget as upstream computed it: rows cleared over all
++`w+w+2` entries and the multiplier bound entering squared. It is the summand of
++`proxyRoundingInputFormula`, which is kept as the cutoff exponent. -/
++private def coarseInputBits (w L : ℕ) : ℕ :=
++  w+1+(w+1+((w+1)+(((w+1)*(w+1)+((w+1)+L*(w+w+2)*2)*(w+1))*2+L*(w+w+2))))+1
++
++/-- The sharper budget exponent is below the one inside the kept cutoff formula. -/
++private theorem fiberCommitInputBits_le_coarse (w L : ℕ) :
++    fiberCommitInputBits w w L ≤ coarseInputBits w L := by
++  unfold fiberCommitInputBits fiberProjectionBits fiberTestBitBound coarseInputBits
++  dsimp only
++  have hu : L*(w+2) ≤ L*(w+w+2) := Nat.mul_le_mul_left _ (by omega)
++  have hX : (w+1)*(w+1)+((w+1)+L*(w+2)*2)*(w+1) ≤
++      (w+1)*(w+1)+((w+1)+L*(w+w+2)*2)*(w+1) := by gcongr
++  omega
++
+ /-- The input coefficient cap for rounding all projected halfspaces is dominated uniformly
+ in the number of generators and without reference to any unobserved minor. -/
+ theorem manuscript_commit_inputWidth (N j : ℕ) (hj : j ≤ (N+1)^6) :
+@@ -76,7 +92,8 @@
+   have h := size_le_succ_of_le_two_pow (fiberCommitInput_le_two_pow j w H L hH)
+   have hmono : fiberCommitInputBits j w L ≤ fiberCommitInputBits w w L :=
+     projectionInputBits_mono (i := j) (w := w) (L := L) hj
+-  change _ ≤ fiberCommitInputBits w w L + 4*w + 2*B + 40
++  have hcoarse := fiberCommitInputBits_le_coarse w L
++  change _ ≤ coarseInputBits w L + 4*w + 2*B + 40
+   omega
+ 
+ /-- The smaller sign-rounding bound in a requested extension is also covered, with one
+@@ -100,7 +117,7 @@
+       _ ≤ 2^(d+2)*2^(2*d+7) := Nat.mul_le_mul (d+2).lt_two_pow_self.le hK3
+       _ = _ := by rw [← pow_add]; congr 1; omega
+   have h := size_le_succ_of_le_two_pow hM
+-  change _ ≤ fiberCommitInputBits w w (fiberClipBits B (fiberCoefficientBits B (2*w+B+14))) +
++  change _ ≤ coarseInputBits w (fiberClipBits B (fiberCoefficientBits B (2*w+B+14))) +
+     4*w + 2*B + 40
+   dsimp only [d] at h ⊢
+   change j ≤ w at hj
+--- a/OAI/Optimization/LinearProgramming/Compression/RoundingBudgets.lean
++++ b/OAI/Optimization/LinearProgramming/Compression/RoundingBudgets.lean
+@@ -66,24 +66,24 @@
+   let h := bmax (bmul (cutoff (uadd g (uconst e 1))) grid) (bmul (bconst e 2) grid)
+   exact bmul (badd (badd (bits r) (bconst e 17)) (bmul (bconst e 4) h)) (bmul grid (bpow h (uconst e 4)))
+ 
+-private noncomputable def proj (d : U e a) (g : U e b) (H : B e c) : B e
+-    (fun x => projectionCoefficientBound (a x) (clearedProjectionRowBound (b x) (a x) (c x))) := by
+-  let row := bpow H (uadd (uadd g d) (uconst e 2))
++private noncomputable def proj (d : U e a) (H : B e c) : B e
++    (fun x => projectionCoefficientBound (a x) (fiberClearedRowBound (a x) (c x))) := by
++  let row := bpow H (uadd d (uconst e 2))
+   let t := uadd d (uconst e 1)
+   let sq := bpow (bmax (bconst e 1) row) (uconst e 2)
+   let w := bmul (factorialP.comp t) (bpow (bmul (bits t) sq) t)
+-  exact bmul (bits t) (bmul (bpow w (uconst e 2)) row)
++  exact bmul (bits t) (bmul w row)
+ 
+ private theorem list_sum_range (n : ℕ) (f : ℕ → ℕ) : ((List.range n).map f).sum=∑ i ∈ Finset.range n, f i := by
+   induction n with
+   | zero => simp
+   | succ n ih => simp [List.range_succ,Finset.sum_range_succ,ih]
+ 
+-private noncomputable def fiber (g : U e a) (w : U e b) (H : B e c) :
++private noncomputable def fiber (_g : U e a) (w : U e b) (H : B e c) :
+     B e (fun x => fiberProjectionBudget (a x) (b x) (c x)) := by
+   let ctx := second unaryCode e
+-  let item := proj (first unaryCode e) (g.comp ctx) (H.comp ctx)
+-  let terms := tabulate (f := fun x i => projectionCoefficientBound i (clearedProjectionRowBound (a x) i (c x))) 0 item
++  let item := proj (first unaryCode e) (H.comp ctx)
++  let terms := tabulate (f := fun x i => projectionCoefficientBound i (fiberClearedRowBound i (c x))) 0 item
+   let rows := terms.comp ((uadd w (uconst e 1)).pair (identity e))
+   exact (PriceGame.Control.Native.sumWeightScoresP.comp rows).congrFun (by intro x; exact list_sum_range _ _)
+ 

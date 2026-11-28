@@ -29,4 +29,8 @@ if [ "${CLOCK:-1}" = 1 ]; then patch -p1 < "$HERE/clock.patch"; fi
 # Optional third patch: lower the precision radius 100(N+1)^3 -> 6N+16. Applies on top of
 # the first two.
 if [ "${CLOCK:-1}" = 1 ] && [ "${RADIUS:-1}" = 1 ]; then patch -p1 < "$HERE/radius.patch"; fi
+# Optional fourth patch: tighten the bit-length bound of the compressed values
+# (onlineMinorBitFormula from about 80 w^8 to about 10 w^5, degree 24 -> 15 in N). Applies on
+# top of the first three and adds the module Compression/PinnedPoint.lean.
+if [ "${CLOCK:-1}" = 1 ] && [ "${RADIUS:-1}" = 1 ] && [ "${W8:-1}" = 1 ]; then patch -p1 < "$HERE/w8.patch"; fi
 lake build OAI.Optimization.LinearProgramming.Optimization OAI.Optimization.LinearProgramming.Feasibility

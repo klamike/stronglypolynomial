@@ -380,12 +380,25 @@ End to end: with the same patch and no further edits, upstream's top-level theor
 `strongly_polynomial_optimization` and `strongly_polynomial_feasibility` build (1552 modules,
 10781 jobs, no errors or warnings) and depend only on the standard axioms
 ([upstream-patches/build-full.sh](upstream-patches/build-full.sh) reproduces this). Two
-quantities in upstream's accounting are defined through the bit formula and therefore
-shrink with it: the range given to the price search, `2^(1 + onlineMinorBitFormula n)`
-(`BitRAM/NativePriceEpoch.lean`), and the query clock of a side decision,
-`subspaceQueryClock n = (n + onlineMinorBitFormula n + 3)^1510`
-(`Geometry/DimensionBounds.lean`). With the bit formula going from degree 48 to degree 24,
-the degree of that clock as a polynomial in `n` halves.
+definitions in upstream's accounting are stated through the bit formula and therefore
+shrink with it: a range for the price search, `2^(1 + onlineMinorBitFormula n)`
+(`initializeOnlineEpoch`, `BitRAM/NativePriceEpoch.lean`), and a query clock of a side
+decision, `subspaceQueryClock n = (n + onlineMinorBitFormula n + 3)^1510`
+(`Geometry/DimensionBounds.lean`).
+
+**Correction (28 November 2026).** An earlier version of this section presented those two
+definitions as the range and clock of upstream's algorithm. They are not what its top-level
+theorems use: neither definition has a consumer outside its own file. The procedure behind
+`strongly_polynomial_optimization` takes its range from `normal_decision_of_primitives`
+(`NormalSubspace/Main.lean`), which sets `B := coef · (X+1)^degree`, one polynomial that
+bounds the clock, the reply bits and the height of the compression service at once
+(`service_of_online`, `Geometry/BorderService.lean`), and runs the price search with range
+`2^(1 + B.eval n)`. The clock has a far larger degree than the bit bound, so the range
+actually used is far larger than the compression theorem's bound, and none of the
+reductions of the bit formula in this section reaches it yet. What the patches change is
+the bound proved by the compression theorems themselves (`minor_transcript_guarantees`,
+`onlineMinorCompression`). Decoupling the range from the clock is in progress; the
+top-level statements are existential in their polynomials and mention neither.
 
 The constants of upstream's price search can also be lowered within its own proofs
 ([upstream-patches/clock.patch](upstream-patches/clock.patch), 27 files, applied on top of
@@ -431,6 +444,37 @@ is a constant factor, not a degree: with the polynomial width the bit formula is
 by `80 w⁸` either way, so its degree stays 24 and the bit count drops by a factor of about
 18 (4 or 5 in the base-two logarithm of the exponent). The fuel and resource polynomials of
 the machine-model layer are kept at the old radius as over-estimates.
+
+The bit formula itself can be tightened
+([upstream-patches/w8.patch](upstream-patches/w8.patch), 12 files, on top of the three
+patches above; trace and list of edits in
+[upstream-patches/W8-REPORT.md](upstream-patches/W8-REPORT.md)). Upstream's formal chain
+bounds the bit length of the compressed values by about `80 w⁸` in the width `w`, where
+the preprint's text gives order `D⁴ K`, which in upstream's parametrization is `w⁵`. Three
+powers of `w` were artefacts of the formal proof: the height of the commitment entered
+Cramer's bound for the pinned point as if it were a row height (two powers), and each
+coordinate of that point was treated as a separate fraction (one power). With a common
+denominator for the commitment and for the pinned point, and three smaller tightenings,
+`onlineMinorBitFormula` is about `10 w⁵`: its degree in `N` goes from 24 to 15, and the
+top-level theorems build with standard axioms (1555 modules, 10782 jobs).
+
+| `N` | 1 | 4 | 16 | 64 | 256 | 1024 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `⌊log₂⌋` of the bit formula, before | 41 | 77 | 124 | 172 | 220 | 268 |
+| after | 26 | 48 | 77 | 107 | 137 | 167 |
+
+Caveats. This patch adds mathematics, not only arithmetic: a new file
+`Compression/PinnedPoint.lean` (388 lines) repeats the tight-rank and Cramer argument for a
+point with a common denominator. The structure `ValidEpochCommit` gained a field (the
+commitment is an integer vector over one denominator), so theorems that assume it, such as
+`minor_transcript_guarantees`, now assume more; both producers of commitments in the
+development supply the field, and one theorem (`validEpochCommit_of_encoded_signs`) gained
+a hypothesis. No theorem was deleted, the old bound is kept as
+`fiber_manuscript_value_height_coarse`, and the fuel formulas of the machine-model layer
+are unchanged. One more power of `w` is known to be lost (rows are cleared as if their
+entries had unrelated denominators, while the rows produced share one); removing it is in
+progress. By the correction above, this is a bound of the compression theorem and does not
+yet shrink the range used by the top-level procedure.
 
 How the upstream Lean development handles this constant (from reading its sources; apart
 from the core just described, nothing in this paragraph is checked by a compiler). Its `paperWidth N =
@@ -647,8 +691,8 @@ docs/                      the project site (GitHub Pages), one static page
 formal/                    the Lean project (library SPLP)
 scripts/fetch-upstream.sh  sparse checkout of openai/math into src/ (pinned commit)
 src/                       upstream reference checkout; not tracked, nothing in formal/ depends on it
-upstream-patches/          patch and script that rebuild upstream's compression core with a smaller width
-upstream-build/            output of that script; not tracked
+upstream-patches/          patches, reports and scripts that rebuild upstream's development with smaller constants
+upstream-build*/           outputs of those scripts; not tracked
 ```
 
 To build from a fresh clone (needs [elan](https://github.com/leanprover/elan); the first

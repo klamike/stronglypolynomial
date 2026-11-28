@@ -277,7 +277,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     <li><b>51</b> Lean files, about 13,100 lines</li>
     <li><b>0</b> uses of <span class="mono">sorry</span></li>
     <li><b>3</b> axioms: <span class="mono">propext</span>, <span class="mono">Classical.choice</span>, <span class="mono">Quot.sound</span></li>
-    <li><b>3</b> patches compiled through upstream's top-level theorems</li>
+    <li><b>4</b> patches compiled through upstream's top-level theorems</li>
   </ul>
 </div>
 
@@ -341,9 +341,9 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
         <div class="foot"><span class="tag comp"><i>⚙</i> Compiled patch</span></div>
       </div>
       <div class="tile">
-        <p class="what">Degree in <var>N</var> of upstream's bound on the bit length of compressed values (this fixes log <var>R</var>)</p>
-        <div class="delta"><span class="old">48</span><span class="arr">→</span><span class="new">24</span></div>
-        <p class="note">The compression width (<var>N</var>+1)<sup>6</sup> is replaced by (7<var>N</var>²+8)<var>N</var>+1. A width of order <var>N</var>² log <var>N</var> compiles for the mathematical core only.</p>
+        <p class="what">Degree in <var>N</var> of upstream's bound on the bit length of compressed values</p>
+        <div class="delta"><span class="old">48</span><span class="arr">→</span><span class="new">15</span></div>
+        <p class="note">Width (<var>N</var>+1)<sup>6</sup> → (7<var>N</var>²+8)<var>N</var>+1 gives 24; tightening the proof chain from 80<var>w</var><sup>8</sup> to 10<var>w</var><sup>5</sup> gives 15. Upstream's top-level procedure does not use this bound for its range yet (see result 6).</p>
         <div class="foot"><span class="tag comp"><i>⚙</i> Compiled patch</span></div>
       </div>
       <div class="tile">
@@ -394,7 +394,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
         <tr>
           <td class="rail indent-1"><span class="lvl">Range of the demands, log <var>R</var></span><span class="sub">set by compression and precision, Sections 4–5</span></td>
           <td>Order <var>D</var><sup>4</sup><var>K</var>, about <var>N</var><sup>27</sup> with its constants. Upstream's formula: about 80(<var>N</var>+1)<sup>48</sup>.</td>
-          <td>Upstream's formula lowered to degree 24. For the text: order <var>N</var><sup>11</sup> log<sup>4</sup><var>N</var> with the smaller <var>D</var>, and <var>N</var><sup>9</sup> log<sup>4</sup><var>N</var> if the precision results carry through.</td>
+          <td>Upstream's formula lowered to degree 15, though its top-level procedure does not use it for the range yet. For the text: order <var>N</var><sup>11</sup> log<sup>4</sup><var>N</var> with the smaller <var>D</var>, and <var>N</var><sup>9</sup> log<sup>4</sup><var>N</var> if the precision results carry through.</td>
           <td><span class="tag comp"><i>⚙</i> Compiled patch</span><br><span class="tag est" style="margin-top:6px"><i>~</i> Not formalized</span></td>
         </tr>
         <tr>
@@ -530,17 +530,20 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
         <div class="body">
           <h3>The compression constant, here and in upstream's development</h3>
           <p>The range <var>R</var> is not a property of the linear program. It is the size of the short substitutes that Section 5 computes for logarithms of minors, and it is governed by one constant <var>D</var>, a bound on dissociated sets of minors. The preprint fixes <var>D</var> = (<var>d</var>+1)<sup>6</sup>. Lemma 5.1 is formalized here with 12<var>d</var>²⌈log<sub>2</sub>(<var>d</var>+1)⌉, and log <var>R</var> is shown to be of order <var>D</var><sup>4</sup><var>K</var> for the preprint's formulas.</p>
-          <p>The same change is carried into upstream's Lean development by three patches, applied in order (width, search constants, precision radius). After all of them its two top-level theorems build (1,552 modules) with standard axioms.</p>
+          <p>The same change is carried into upstream's Lean development by four patches, applied in order (width, search constants, precision radius, bit formula). After all of them its two top-level theorems build (1,555 modules) with standard axioms.</p>
           <table class="bars" aria-label="Quantities in upstream's development before and after the patches">
             <thead><tr><th>Quantity in upstream</th><th>Before</th><th>After</th></tr></thead>
             <tbody>
               <tr><td>Compression width</td><td>(<var>N</var>+1)<sup>6</sup></td><td>(7<var>N</var>²+8)<var>N</var>+1</td></tr>
-              <tr><td>Bit formula, degree in <var>N</var></td><td>48</td><td>24</td></tr>
+              <tr><td>Bit formula, degree in <var>N</var></td><td>48</td><td>15</td></tr>
+              <tr><td>Bit formula in the width <var>w</var></td><td>≈ 80<var>w</var><sup>8</sup></td><td>≈ 10<var>w</var><sup>5</sup></td></tr>
               <tr><td>Probes per node</td><td>2<sup>600</sup>+1</td><td>2<sup>557</sup>+1</td></tr>
               <tr><td>Query bound</td><td><var>x</var><sup>1510</sup></td><td><var>x</var><sup>989</sup></td></tr>
               <tr><td>Precision radius</td><td>100(<var>N</var>+1)³</td><td>6<var>N</var>+16</td></tr>
             </tbody>
           </table>
+          <p><strong>Correction, 28 November.</strong> An earlier version of these notes said the smaller bit bound shrinks the range of upstream's price search. It does not yet. The procedure behind upstream's top-level theorem takes its range from one polynomial that bounds the clock, the reply bits and the height of the compression service at once, and the clock is far larger. The patches lower the bound proved by the compression theorems; decoupling the range from the clock is in progress.</p>
+          <p>The bit-formula patch also adds mathematics: a 388-line file with a common-denominator version of the Cramer argument, and one more field in a hypothesis structure of the compression theorem, which both producers in the development supply.</p>
         </div>
         <aside>
           <div class="tags"><span class="tag lean"><i>✓</i> Lean theorem</span><span class="tag comp"><i>⚙</i> Compiled patch</span></div>
@@ -550,6 +553,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
             <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/upstream-patches/WIDTH-REPORT.md">Width report</a></li>
             <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/upstream-patches/CLOCK-REPORT.md">Clock report</a></li>
             <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/upstream-patches/RADIUS-REPORT.md">Radius report</a></li>
+            <li><a href="https://github.com/klamike/stronglypolynomial/blob/main/upstream-patches/W8-REPORT.md">Bit-formula report</a></li>
           </ul>
         </aside>
       </div>
@@ -650,26 +654,26 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     <div class="sec-head">
       <p class="kicker">Current directions</p>
       <h2>In progress and open</h2>
-      <p>Three tracks are running as of 28 November 2026. None has a verified result yet; this section will be updated when they land or fail.</p>
+      <p>Three tracks are running as of 28 November 2026. This section is updated when they land or fail.</p>
     </div>
     <div class="now">
       <article>
         <span class="state">In progress</span>
-        <h3>Upstream's <var>w</var><sup>8</sup> bit formula</h3>
-        <p>Upstream bounds the bit length of compressed values by about 80<var>w</var><sup>8</sup> in the width <var>w</var>. The preprint's text gives order <var>w</var><sup>4</sup><var>K</var>, at most about <var>w</var><sup>5</sup>. So upstream's formal chain loses about three powers of <var>w</var>, each worth a factor <var>N</var>³.</p>
-        <p>Goal: find where and recover what the existing proofs allow.</p>
+        <h3>The price range upstream actually uses</h3>
+        <p>Upstream's top-level procedure runs its price search with a range set by the clock of the compression service, not by the compression bound. So no reduction of that bound reaches the running algorithm yet.</p>
+        <p>Goal: give the range its own polynomial, and record it in a theorem, since the top-level statement hides it.</p>
+      </article>
+      <article>
+        <span class="state">In progress</span>
+        <h3>One more power of <var>w</var></h3>
+        <p>The bit formula went from 80<var>w</var><sup>8</sup> to 10<var>w</var><sup>5</sup>, which matches the preprint's text. One power is still lost where rows are cleared as if their entries had unrelated denominators; the rows produced share one.</p>
+        <p>Goal: about 12<var>w</var><sup>4</sup>, degree 12 in <var>N</var>.</p>
       </article>
       <article>
         <span class="state">In progress</span>
         <h3>Upstream's search constants</h3>
         <p>The 2<sup>557</sup> probes per node are pinned by a charging constant 2<sup>−272</sup> that comes from 64-coordinate skeletons. The preprint's text uses arity 4 and 2<sup>19</sup> probes.</p>
         <p>Goal: retune the parameters consistently inside upstream's proof architecture.</p>
-      </article>
-      <article>
-        <span class="state">In progress</span>
-        <h3>The <var>N</var>² log <var>N</var> width, end to end</h3>
-        <p>The smaller width compiles for the mathematical core, but upstream's machine-model layer wants a polynomial bit budget, and a logarithm is not one.</p>
-        <p>Goal: scope whether the algorithm can run with the smaller width while the machine layer keeps a polynomial over-estimate.</p>
       </article>
     </div>
 
@@ -690,6 +694,12 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
         <div>
           <h3>Close the gaps in the precision argument</h3>
           <p>Formalize that Section 4.3 of the preprint is exactly a system of two-slot comparisons, that calibration's rows have the form the coefficient bound assumes, and that the smaller constant <var>D</var> propagates through Lemmas 5.2 to 5.4. Until then the estimates log <var>R</var> ≈ <var>N</var><sup>11</sup> and <var>N</var><sup>9</sup> stay estimates.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3>The <var>N</var>² log <var>N</var> width, end to end</h3>
+          <p>The smaller width compiles for the mathematical core. Scoped by reading, not yet done: the width can be changed in four files, but the gain only matters once the range is decoupled from the clock, and using a non-polynomial bit budget on the machine model needs a new program for the range exponent.</p>
         </div>
       </li>
       <li>
@@ -739,7 +749,7 @@ lake exe cache get &amp;&amp; lake build</pre>
 git -C src sparse-checkout add lean/OAI/Computability
 <span class="c"># 54-module compression core, smaller width</span>
 upstream-patches/build-core.sh
-<span class="c"># width, clock and radius patches, up to the top-level theorems</span>
+<span class="c"># width, clock, radius and bit-formula patches, up to the top-level theorems</span>
 upstream-patches/build-full.sh
 <span class="c"># the short strategy against upstream's query model</span>
 upstream-patches/port/build-port.sh</pre>
